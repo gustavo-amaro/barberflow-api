@@ -1,0 +1,45 @@
+# Symfony
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+
+# PHPUnit
+/phpunit.xml
+.phpunit.result.cache
+
+# Composer
+composer.phar
+
+# PHPStan
+phpstan.neon
+
+# IDE
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# JWT Keys
+/config/jwt/*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Cache
+*.cache
+
+# Build
+/build/

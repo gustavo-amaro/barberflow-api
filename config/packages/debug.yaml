@@ -1,0 +1,4 @@
+when@dev:
+    debug:
+        # Uncomment the following line to enable the debug toolbar
+        dump_destination: "tcp://%env(VAR_DUMPER_SERVER)%"
