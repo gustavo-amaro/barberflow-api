@@ -3,6 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Entity\Appointment;
+use App\Entity\Client;
 use App\Entity\User;
 use App\Repository\AppointmentRepository;
 use App\Repository\BarberRepository;
@@ -67,6 +68,30 @@ class AppointmentController extends AbstractController
             $appointments = $this->appointmentRepository->findTodayByShop($shop);
         }
 
+        // Auto-complete: confirmados cujo horário já passou viram completed
+        $now = new \DateTime('now');
+        $changed = false;
+        foreach ($appointments as $apt) {
+            if ($apt->getStatus() !== Appointment::STATUS_CONFIRMED) {
+                continue;
+            }
+            $aptDateTime = new \DateTime(
+                $apt->getDate()->format('Y-m-d') . ' ' . $apt->getTime()->format('H:i:s')
+            );
+            if ($aptDateTime <= $now) {
+                $apt->complete();
+                $client = $apt->getClient();
+                if ($client) {
+                    $client->incrementVisits();
+                    $client->addToTotalSpent($apt->getPrice());
+                }
+                $changed = true;
+            }
+        }
+        if ($changed) {
+            $this->entityManager->flush();
+        }
+
         return $this->json(
             $this->serializer->normalize($appointments, null, ['groups' => 'appointment:read'])
         );
@@ -119,12 +144,35 @@ class AppointmentController extends AbstractController
             return $this->json(['error' => 'Serviço não encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // Optional: find or create client
+        $aptDate = new \DateTime($data['date'] ?? 'today');
+        $aptTime = new \DateTime($data['time'] ?? 'now');
+        $existing = $this->appointmentRepository->findOneByBarberAndDateTime($barber, $aptDate, $aptTime);
+        if ($existing) {
+            return $this->json(
+                ['error' => 'Este barbeiro já possui um agendamento neste horário. Escolha outro horário ou outro profissional.'],
+                Response::HTTP_CONFLICT
+            );
+        }
+
+        // Find or create client (by phone if no client_id)
         $client = null;
-        if (isset($data['client_id'])) {
+        if (isset($data['client_id']) && $data['client_id']) {
             $client = $this->clientRepository->find($data['client_id']);
             if (!$client || $client->getShop()->getId() !== $shop->getId()) {
                 return $this->json(['error' => 'Cliente não encontrado'], Response::HTTP_NOT_FOUND);
+            }
+        } else {
+            $phone = isset($data['phone']) ? trim((string) $data['phone']) : null;
+            $clientName = isset($data['client_name']) ? trim((string) $data['client_name']) : '';
+            if ($phone !== null && $phone !== '') {
+                $client = $this->clientRepository->findOneByShopAndPhoneNormalized($shop, $phone);
+                if (!$client) {
+                    $client = new Client();
+                    $client->setShop($shop);
+                    $client->setName($clientName !== '' ? $clientName : 'Cliente');
+                    $client->setPhone(preg_replace('/\D/', '', $phone));
+                    $this->entityManager->persist($client);
+                }
             }
         }
 
@@ -236,6 +284,19 @@ class AppointmentController extends AbstractController
         }
         if (isset($data['price'])) {
             $appointment->setPrice($data['price']);
+        }
+
+        $existing = $this->appointmentRepository->findOneByBarberAndDateTime(
+            $appointment->getBarber(),
+            $appointment->getDate(),
+            $appointment->getTime(),
+            $appointment->getId()
+        );
+        if ($existing) {
+            return $this->json(
+                ['error' => 'Este barbeiro já possui um agendamento neste horário. Escolha outro horário ou outro profissional.'],
+                Response::HTTP_CONFLICT
+            );
         }
 
         // Validate

@@ -57,6 +57,25 @@ class ClientRepository extends ServiceEntityRepository
     }
 
     /**
+     * Busca cliente pelo telefone, comparando apenas dígitos (ex.: (11) 99988-7766 = 11999887766).
+     */
+    public function findOneByShopAndPhoneNormalized(Shop $shop, string $phone): ?Client
+    {
+        $digits = preg_replace('/\D/', '', $phone);
+        if ($digits === '') {
+            return null;
+        }
+        $all = $this->findBy(['shop' => $shop]);
+        foreach ($all as $client) {
+            $clientPhone = $client->getPhone();
+            if ($clientPhone !== null && preg_replace('/\D/', '', $clientPhone) === $digits) {
+                return $client;
+            }
+        }
+        return null;
+    }
+
+    /**
      * @return Client[]
      */
     public function findTopClientsByShop(Shop $shop, int $limit = 10): array

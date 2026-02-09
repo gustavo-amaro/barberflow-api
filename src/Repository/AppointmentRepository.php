@@ -71,6 +71,27 @@ class AppointmentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Retorna um agendamento (não cancelado) do barbeiro na data e horário informados, se existir.
+     * @param int|null $excludeId ID do agendamento a ignorar (útil no update)
+     */
+    public function findOneByBarberAndDateTime(Barber $barber, \DateTimeInterface $date, \DateTimeInterface $time, ?int $excludeId = null): ?Appointment
+    {
+        $qb = $this->createQueryBuilder('a')
+            ->andWhere('a.barber = :barber')
+            ->andWhere('a.date = :date')
+            ->andWhere('a.time = :time')
+            ->andWhere('a.status != :cancelled')
+            ->setParameter('barber', $barber)
+            ->setParameter('date', $date)
+            ->setParameter('time', $time)
+            ->setParameter('cancelled', Appointment::STATUS_CANCELLED);
+        if ($excludeId !== null) {
+            $qb->andWhere('a.id != :excludeId')->setParameter('excludeId', $excludeId);
+        }
+        return $qb->setMaxResults(1)->getQuery()->getOneOrNullResult();
+    }
+
+    /**
      * @return Appointment[]
      */
     public function findByShopAndDate(Shop $shop, \DateTimeInterface $date): array
