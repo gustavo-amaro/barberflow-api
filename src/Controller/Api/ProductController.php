@@ -3,7 +3,9 @@
 namespace App\Controller\Api;
 
 use App\Entity\Product;
+use App\Entity\ProductMovement;
 use App\Entity\User;
+use App\Repository\ProductMovementRepository;
 use App\Repository\ProductRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,6 +22,7 @@ class ProductController extends AbstractController
     public function __construct(
         private EntityManagerInterface $entityManager,
         private ProductRepository $productRepository,
+        private ProductMovementRepository $productMovementRepository,
         private SerializerInterface $serializer,
         private ValidatorInterface $validator
     ) {}
@@ -49,6 +52,24 @@ class ProductController extends AbstractController
         return $this->json(
             $this->serializer->normalize($products, null, ['groups' => 'product:read'])
         );
+    }
+
+    #[Route('/stats', name: 'api_products_stats', methods: ['GET'])]
+    public function stats(): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        $shop = $user->getShop();
+
+        if (!$shop) {
+            return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $salesThisMonth = $this->productMovementRepository->countSalesThisMonth($shop);
+
+        return $this->json([
+            'salesThisMonth' => $salesThisMonth,
+        ]);
     }
 
     #[Route('', name: 'api_products_create', methods: ['POST'])]
@@ -245,6 +266,14 @@ class ProductController extends AbstractController
         } else {
             $product->setStock($quantity);
         }
+
+        $movement = new ProductMovement();
+        $movement->setShop($shop);
+        $movement->setProduct($product);
+        $movement->setQuantity($quantity);
+        $movement->setOperation($operation === 'subtract' ? ProductMovement::OPERATION_SALE : ProductMovement::OPERATION_PURCHASE);
+        $movement->setCreatedAtValue();
+        $this->entityManager->persist($movement);
 
         $this->entityManager->flush();
 

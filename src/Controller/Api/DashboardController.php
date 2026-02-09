@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\AppointmentRepository;
 use App\Repository\BarberRepository;
 use App\Repository\ClientRepository;
+use App\Repository\ProductMovementRepository;
 use App\Repository\ProductRepository;
 use App\Repository\ServiceRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,6 +24,7 @@ class DashboardController extends AbstractController
         private BarberRepository $barberRepository,
         private ServiceRepository $serviceRepository,
         private ProductRepository $productRepository,
+        private ProductMovementRepository $productMovementRepository,
         private ClientRepository $clientRepository
     ) {}
 
@@ -38,17 +40,33 @@ class DashboardController extends AbstractController
         }
 
         $today = new \DateTime('today');
-        $startOfMonth = new \DateTime('first day of this month');
-        $endOfMonth = new \DateTime('last day of this month');
+        $startOfMonth = new \DateTimeImmutable('first day of this month 00:00:00');
+        $endOfMonth = new \DateTimeImmutable('last day of this month 23:59:59');
+        $startOfLastMonth = new \DateTimeImmutable('first day of last month 00:00:00');
+        $endOfLastMonth = new \DateTimeImmutable('last day of last month 23:59:59');
 
         // Today's appointments
         $todayAppointments = $this->appointmentRepository->findByShopAndDate($shop, $today);
+        $yesterday = new \DateTime('yesterday');
+        $todayRevenue = $this->appointmentRepository->getRevenueByShopAndDate($shop, $today);
+        $yesterdayRevenue = $this->appointmentRepository->getRevenueByShopAndDate($shop, $yesterday);
+        $yesterdayNum = (float) $yesterdayRevenue;
+        $revenueTrend = $yesterdayNum > 0
+            ? (int) round(((float) $todayRevenue - $yesterdayNum) / $yesterdayNum * 100)
+            : ((float) $todayRevenue > 0 ? 100 : 0);
 
         // Pending appointments
         $pendingCount = $this->appointmentRepository->countByShopAndStatus($shop, Appointment::STATUS_PENDING);
 
         // Monthly revenue
         $monthlyRevenue = $this->appointmentRepository->getTotalRevenueByShop($shop, $startOfMonth, $endOfMonth);
+
+        // New clients this month and growth vs last month
+        $newClientsThisMonth = $this->clientRepository->countCreatedInPeriod($shop, $startOfMonth, $endOfMonth);
+        $newClientsLastMonth = $this->clientRepository->countCreatedInPeriod($shop, $startOfLastMonth, $endOfLastMonth);
+        $growth = $newClientsLastMonth > 0
+            ? (int) round(($newClientsThisMonth - $newClientsLastMonth) / $newClientsLastMonth * 100)
+            : ($newClientsThisMonth > 0 ? 100 : 0);
 
         // Total clients
         $totalClients = count($this->clientRepository->findByShop($shop));
@@ -69,9 +87,12 @@ class DashboardController extends AbstractController
             'today' => [
                 'appointments' => count($todayAppointments),
                 'pending' => $pendingCount,
+                'revenueTrend' => $revenueTrend,
             ],
             'monthly' => [
                 'revenue' => $monthlyRevenue,
+                'newClients' => $newClientsThisMonth,
+                'growth' => $growth,
             ],
             'totals' => [
                 'clients' => $totalClients,
@@ -157,6 +178,75 @@ class DashboardController extends AbstractController
             'startDate' => $startDate->format('Y-m-d'),
             'endDate' => $endDate->format('Y-m-d'),
             'revenue' => $revenue,
+        ]);
+    }
+
+    #[Route('/reports', name: 'api_dashboard_reports', methods: ['GET'])]
+    public function reports(): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        $shop = $user->getShop();
+
+        if (!$shop) {
+            return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $startOfMonth = new \DateTimeImmutable('first day of this month 00:00:00');
+        $endOfMonth = new \DateTimeImmutable('last day of this month 23:59:59');
+        $startOfLastMonth = new \DateTimeImmutable('first day of last month 00:00:00');
+        $endOfLastMonth = new \DateTimeImmutable('last day of last month 23:59:59');
+
+        $monthlyRevenue = (float) $this->appointmentRepository->getTotalRevenueByShop($shop, $startOfMonth, $endOfMonth);
+        $lastMonthRevenue = (float) $this->appointmentRepository->getTotalRevenueByShop($shop, $startOfLastMonth, $endOfLastMonth);
+        $revenueTrend = $lastMonthRevenue > 0
+            ? (int) round(($monthlyRevenue - $lastMonthRevenue) / $lastMonthRevenue * 100)
+            : ($monthlyRevenue > 0 ? 100 : 0);
+
+        $appointmentsCount = $this->appointmentRepository->countByShopAndDateRange($shop, $startOfMonth, $endOfMonth);
+        $cancelledCount = $this->appointmentRepository->countCancelledByShopAndDateRange($shop, $startOfMonth, $endOfMonth);
+        $cancellationRate = $appointmentsCount > 0 ? (int) round($cancelledCount / $appointmentsCount * 100) : 0;
+
+        $newClientsThisMonth = $this->clientRepository->countCreatedInPeriod($shop, $startOfMonth, $endOfMonth);
+        $newClientsLastMonth = $this->clientRepository->countCreatedInPeriod($shop, $startOfLastMonth, $endOfLastMonth);
+        $growth = $newClientsLastMonth > 0
+            ? (int) round(($newClientsThisMonth - $newClientsLastMonth) / $newClientsLastMonth * 100)
+            : ($newClientsThisMonth > 0 ? 100 : 0);
+
+        $totalCommissions = (float) $this->appointmentRepository->getTotalCommissionsByShopAndDateRange($shop, $startOfMonth, $endOfMonth);
+        $productRevenue = (float) $this->productMovementRepository->getSalesRevenueByShopAndPeriod($shop, $startOfMonth, $endOfMonth);
+        $netProfit = $monthlyRevenue - $totalCommissions + $productRevenue;
+
+        $revenueByBarber = $this->appointmentRepository->getRevenueByBarberByShopAndDateRange($shop, $startOfMonth, $endOfMonth);
+        $barbers = $this->barberRepository->findByShop($shop);
+        $topBarbers = [];
+        foreach ($barbers as $barber) {
+            $revenue = $revenueByBarber[$barber->getId()] ?? '0';
+            $topBarbers[] = [
+                'id' => $barber->getId(),
+                'name' => $barber->getName(),
+                'avatar' => $barber->getAvatar(),
+                'specialty' => $barber->getSpecialty(),
+                'color' => $barber->getColor(),
+                'revenue' => $revenue,
+            ];
+        }
+        usort($topBarbers, fn($a, $b) => (float) $b['revenue'] <=> (float) $a['revenue']);
+
+        return $this->json([
+            'monthlyRevenue' => (string) $monthlyRevenue,
+            'revenueTrend' => $revenueTrend,
+            'appointmentsCount' => $appointmentsCount,
+            'newClients' => $newClientsThisMonth,
+            'growth' => $growth,
+            'cancellationRate' => $cancellationRate,
+            'summary' => [
+                'grossRevenue' => (string) $monthlyRevenue,
+                'commissions' => (string) $totalCommissions,
+                'productRevenue' => (string) $productRevenue,
+                'netProfit' => (string) round($netProfit, 2),
+            ],
+            'topBarbers' => $topBarbers,
         ]);
     }
 }

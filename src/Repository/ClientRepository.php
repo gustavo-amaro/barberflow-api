@@ -84,4 +84,21 @@ class ClientRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Clientes criados no período (inclusive start e end).
+     */
+    public function countCreatedInPeriod(Shop $shop, \DateTimeInterface $start, \DateTimeInterface $end): int
+    {
+        return (int) $this->createQueryBuilder('c')
+            ->select('COUNT(c.id)')
+            ->andWhere('c.shop = :shop')
+            ->andWhere('c.createdAt >= :start')
+            ->andWhere('c.createdAt <= :end')
+            ->setParameter('shop', $shop)
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

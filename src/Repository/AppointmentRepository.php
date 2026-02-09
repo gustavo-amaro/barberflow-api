@@ -167,4 +167,99 @@ class AppointmentRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getSingleScalarResult() ?? '0.00';
     }
+
+    /**
+     * Soma do preço dos agendamentos de um dia (excluindo cancelados), para comparar faturamento hoje vs ontem.
+     */
+    public function getRevenueByShopAndDate(Shop $shop, \DateTimeInterface $date): string
+    {
+        return (string) ($this->createQueryBuilder('a')
+            ->select('COALESCE(SUM(a.price), 0)')
+            ->join('a.barber', 'b')
+            ->andWhere('b.shop = :shop')
+            ->andWhere('a.date = :date')
+            ->andWhere('a.status != :cancelled')
+            ->setParameter('shop', $shop)
+            ->setParameter('date', $date)
+            ->setParameter('cancelled', Appointment::STATUS_CANCELLED)
+            ->getQuery()
+            ->getSingleScalarResult() ?? '0');
+    }
+
+    /**
+     * Total de agendamentos no período (qualquer status).
+     */
+    public function countByShopAndDateRange(Shop $shop, \DateTimeInterface $start, \DateTimeInterface $end): int
+    {
+        return (int) $this->createQueryBuilder('a')
+            ->select('COUNT(a.id)')
+            ->join('a.barber', 'b')
+            ->andWhere('b.shop = :shop')
+            ->andWhere('a.date >= :start')
+            ->andWhere('a.date <= :end')
+            ->setParameter('shop', $shop)
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * Total de agendamentos cancelados no período.
+     */
+    public function countCancelledByShopAndDateRange(Shop $shop, \DateTimeInterface $start, \DateTimeInterface $end): int
+    {
+        return (int) $this->createQueryBuilder('a')
+            ->select('COUNT(a.id)')
+            ->join('a.barber', 'b')
+            ->andWhere('b.shop = :shop')
+            ->andWhere('a.date >= :start')
+            ->andWhere('a.date <= :end')
+            ->andWhere('a.status = :cancelled')
+            ->setParameter('shop', $shop)
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->setParameter('cancelled', Appointment::STATUS_CANCELLED)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * Soma das comissões (price * barber.commission/100) dos agendamentos concluídos no período.
+     */
+    public function getTotalCommissionsByShopAndDateRange(Shop $shop, \DateTimeInterface $start, \DateTimeInterface $end): string
+    {
+        $conn = $this->getEntityManager()->getConnection();
+        $sql = 'SELECT COALESCE(SUM(a.price * COALESCE(b.commission, 0) / 100), 0) FROM appointment a INNER JOIN barber b ON a.barber_id = b.id WHERE b.shop_id = :shopId AND a.date >= :start AND a.date <= :end AND a.status = :status';
+        $result = $conn->executeQuery($sql, [
+            'shopId' => $shop->getId(),
+            'start' => $start->format('Y-m-d'),
+            'end' => $end->format('Y-m-d'),
+            'status' => Appointment::STATUS_COMPLETED,
+        ]);
+        return (string) $result->fetchOne();
+    }
+
+    /**
+     * Receita por barbeiro (agendamentos concluídos) no período. Retorna array [barber_id => revenue].
+     *
+     * @return array<int, string>
+     */
+    public function getRevenueByBarberByShopAndDateRange(Shop $shop, \DateTimeInterface $start, \DateTimeInterface $end): array
+    {
+        $conn = $this->getEntityManager()->getConnection();
+        $sql = 'SELECT a.barber_id, COALESCE(SUM(a.price), 0) as total FROM appointment a INNER JOIN barber b ON a.barber_id = b.id WHERE b.shop_id = :shopId AND a.date >= :start AND a.date <= :end AND a.status = :status GROUP BY a.barber_id ORDER BY total DESC';
+        $result = $conn->executeQuery($sql, [
+            'shopId' => $shop->getId(),
+            'start' => $start->format('Y-m-d'),
+            'end' => $end->format('Y-m-d'),
+            'status' => Appointment::STATUS_COMPLETED,
+        ]);
+        $rows = $result->fetchAllAssociative();
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) $row['barber_id']] = $row['total'];
+        }
+        return $map;
+    }
 }
