@@ -7,6 +7,7 @@ use App\Entity\Client;
 use App\Entity\Shop;
 use App\Entity\User;
 use App\Repository\AppointmentRepository;
+use App\Service\AppointmentNotificationService;
 use App\Repository\BarberRepository;
 use App\Repository\ClientRepository;
 use App\Repository\ServiceRepository;
@@ -31,7 +32,8 @@ class ShopController extends AbstractController
         private AppointmentRepository $appointmentRepository,
         private ClientRepository $clientRepository,
         private SerializerInterface $serializer,
-        private ValidatorInterface $validator
+        private ValidatorInterface $validator,
+        private AppointmentNotificationService $appointmentNotification
     ) {}
 
     #[Route('', name: 'api_shop_create', methods: ['POST'])]
@@ -276,6 +278,8 @@ class ShopController extends AbstractController
 
         $this->entityManager->persist($appointment);
         $this->entityManager->flush();
+
+        $this->appointmentNotification->notifyShopNewAppointment($appointment);
 
         return $this->json(
             $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read']),

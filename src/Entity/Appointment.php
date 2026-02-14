@@ -82,6 +82,10 @@ class Appointment
     #[Groups(['appointment:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
+    /** Data/hora em que o lembrete (30 min antes) foi enviado à barbearia. */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $reminderSentAt = null;
+
     #[ORM\PrePersist]
     public function setCreatedAtValue(): void
     {
@@ -209,6 +213,17 @@ class Appointment
     public function getUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getReminderSentAt(): ?\DateTimeImmutable
+    {
+        return $this->reminderSentAt;
+    }
+
+    public function setReminderSentAt(?\DateTimeImmutable $reminderSentAt): static
+    {
+        $this->reminderSentAt = $reminderSentAt;
+        return $this;
     }
 
     public function confirm(): static

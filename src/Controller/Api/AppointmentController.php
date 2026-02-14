@@ -9,6 +9,7 @@ use App\Repository\AppointmentRepository;
 use App\Repository\BarberRepository;
 use App\Repository\ClientRepository;
 use App\Repository\ServiceRepository;
+use App\Service\AppointmentNotificationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -28,7 +29,8 @@ class AppointmentController extends AbstractController
         private ServiceRepository $serviceRepository,
         private ClientRepository $clientRepository,
         private SerializerInterface $serializer,
-        private ValidatorInterface $validator
+        private ValidatorInterface $validator,
+        private AppointmentNotificationService $appointmentNotification
     ) {}
 
     #[Route('', name: 'api_appointments_index', methods: ['GET'])]
@@ -200,6 +202,8 @@ class AppointmentController extends AbstractController
         $this->entityManager->persist($appointment);
         $this->entityManager->flush();
 
+        $this->appointmentNotification->notifyShopNewAppointment($appointment);
+
         return $this->json(
             $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read']),
             Response::HTTP_CREATED
@@ -335,6 +339,8 @@ class AppointmentController extends AbstractController
 
         $appointment->confirm();
         $this->entityManager->flush();
+
+        $this->appointmentNotification->notifyClientAppointmentConfirmed($appointment);
 
         return $this->json(
             $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read'])

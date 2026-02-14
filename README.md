@@ -77,6 +77,74 @@ make db-migrate
 make cache-clear
 ```
 
+## Notificações WhatsApp
+
+O sistema envia notificações via WhatsApp (Evolution API) nos seguintes momentos:
+
+| Evento | Quem recebe | Conteúdo |
+|--------|--------------|----------|
+| Cliente agenda (página pública ou painel) | Barbearia | Novo agendamento pendente de confirmação |
+| Barbearia confirma o agendamento | Cliente | Confirmação com data, horário e serviço |
+| 30 min antes do horário confirmado | Barbearia | Lembrete do agendamento |
+
+### Subir Evolution API com MySQL (Docker)
+
+O `docker-compose` já inclui a Evolution API usando o **mesmo MySQL** do Barberflow (banco `evolution`) e Redis:
+
+```bash
+docker compose up -d
+```
+
+- **Evolution API**: http://localhost:8084  
+- **Chave padrão** (no `.env`): `EVOLUTION_API_KEY=evolution_secret_key`
+
+Se o MySQL já existia antes de adicionar o script de init, crie o banco manualmente:
+
+```bash
+docker compose exec database mysql -u barberflow -pbarberflow123 -e "CREATE DATABASE IF NOT EXISTS evolution CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+Depois, acesse http://localhost:8084, crie uma instância (ex: `barberflow`) e escaneie o QR Code com o WhatsApp. No `.env` da API, use:
+
+```env
+WHATSAPP_EVOLUTION_BASE_URL=http://localhost:8084
+WHATSAPP_EVOLUTION_INSTANCE=barberflow
+WHATSAPP_EVOLUTION_API_KEY=evolution_secret_key
+```
+
+*(Se a API PHP rodar dentro do Docker, use `http://evolution_api:8080` em `WHATSAPP_EVOLUTION_BASE_URL`.)*
+
+### Configuração (Evolution API externa)
+
+1. Se não for usar o Docker acima, configure uma instância na [Evolution API](https://evolution-api.com) (self-hosted ou hospedada).
+2. No `.env` da API, preencha:
+
+```env
+WHATSAPP_EVOLUTION_BASE_URL=https://sua-evolution-api.com
+WHATSAPP_EVOLUTION_INSTANCE=nome-da-sua-instancia
+WHATSAPP_EVOLUTION_API_KEY=sua-api-key
+```
+
+3. **Cadastre o telefone da barbearia** no painel (Shop): o número é usado para receber “novo agendamento” e “lembrete em 30 min”.
+4. Os clientes precisam informar o telefone no agendamento para receber a confirmação.
+
+### Lembrete 30 minutos antes (cron)
+
+Para enviar o lembrete à barbearia cerca de 30 minutos antes do horário, execute o comando a cada 5–10 minutos, por exemplo:
+
+```bash
+# A cada 5 minutos (Linux/Mac crontab)
+*/5 * * * * docker compose -f /caminho/barberflow-api/docker-compose.yml exec -T php php bin/console app:appointment-reminders
+```
+
+Ou com Make (se existir target):
+
+```bash
+php bin/console app:appointment-reminders
+```
+
+Se as variáveis WhatsApp no `.env` estiverem vazias, as notificações ficam desativadas e o sistema segue funcionando normalmente.
+
 ## Endpoints da API
 
 ### Autenticação

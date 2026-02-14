@@ -46,9 +46,47 @@ services:
       - "33066:3306"
     volumes:
       - barberflow_db_data:/var/lib/mysql
+      - ./docker/mysql/init-evolution.sql:/docker-entrypoint-initdb.d/02-evolution.sql
     networks:
       - barberflow_network
     command: --default-authentication-plugin=mysql_native_password
+
+  # Redis (cache para Evolution API)
+  evolution_redis:
+    image: redis:7-alpine
+    container_name: barberflow_evolution_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - evolution_redis_data:/data
+    networks:
+      - barberflow_network
+    expose:
+      - "6379"
+
+  # Evolution API (WhatsApp) - usa o mesmo MySQL, banco "evolution"
+  evolution_api:
+    image: evoapicloud/evolution-api:latest
+    container_name: barberflow_evolution_api
+    restart: unless-stopped
+    ports:
+      - "8084:8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - barberflow_network
+    depends_on:
+      - database
+      - evolution_redis
+    environment:
+      SERVER_PORT: "8080"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: mysql
+      DATABASE_CONNECTION_URI: mysql://${DB_USER:-barberflow}:${DB_PASSWORD:-barberflow123}@database:3306/evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution_redis:6379
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-evolution_secret_key}
+      LOG_LEVEL: ERROR,WARN,INFO
 
   # phpMyAdmin
   phpmyadmin:
@@ -73,3 +111,5 @@ networks:
 
 volumes:
   barberflow_db_data:
+  evolution_redis_data:
+  evolution_instances:

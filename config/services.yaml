@@ -6,6 +6,14 @@
 parameters:
 
 services:
+    # WhatsApp - Evolution API (deixe variáveis vazias no .env para desativar)
+    App\Service\WhatsApp\EvolutionApiWhatsAppService:
+        arguments:
+            $evolutionBaseUrl: '%env(WHATSAPP_EVOLUTION_BASE_URL)%'
+            $evolutionInstanceName: '%env(WHATSAPP_EVOLUTION_INSTANCE)%'
+            $evolutionApiKey: '%env(WHATSAPP_EVOLUTION_API_KEY)%'
+
+    App\Service\WhatsApp\WhatsAppServiceInterface: '@App\Service\WhatsApp\EvolutionApiWhatsAppService'
     # default configuration for services in *this* file
     _defaults:
         autowire: true      # Automatically injects dependencies in your services.
@@ -19,6 +27,7 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+            - '../src/Service/WhatsApp/EvolutionApiWhatsAppService.php'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

@@ -226,6 +226,33 @@ class AppointmentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Agendamentos confirmados que ocorrem entre $windowStart e $windowEnd minutos a partir de agora
+     * e ainda não tiveram lembrete (30 min antes) enviado.
+     * Uso: windowStart=25, windowEnd=35 para enviar lembrete "em 30 min" quando o cron roda a cada 5 min.
+     *
+     * @return Appointment[]
+     */
+    public function findConfirmedInNextMinutesWithoutReminder(int $windowStartMinutes = 25, int $windowEndMinutes = 35): array
+    {
+        $now = new \DateTime('now');
+        $windowStart = (clone $now)->modify("+{$windowStartMinutes} minutes");
+        $windowEnd = (clone $now)->modify("+{$windowEndMinutes} minutes");
+
+        return $this->createQueryBuilder('a')
+            ->andWhere('a.status = :status')
+            ->andWhere('a.reminderSentAt IS NULL')
+            ->andWhere("CONCAT(a.date, ' ', a.time) >= :windowStart")
+            ->andWhere("CONCAT(a.date, ' ', a.time) <= :windowEnd")
+            ->setParameter('status', Appointment::STATUS_CONFIRMED)
+            ->setParameter('windowStart', $windowStart->format('Y-m-d H:i:s'))
+            ->setParameter('windowEnd', $windowEnd->format('Y-m-d H:i:s'))
+            ->orderBy('a.date', 'ASC')
+            ->addOrderBy('a.time', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Total de agendamentos cancelados no período.
      */
     public function countCancelledByShopAndDateRange(Shop $shop, \DateTimeInterface $start, \DateTimeInterface $end): int
