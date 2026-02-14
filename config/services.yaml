@@ -10,8 +10,12 @@ services:
     App\Service\WhatsApp\EvolutionApiWhatsAppService:
         arguments:
             $evolutionBaseUrl: '%env(WHATSAPP_EVOLUTION_BASE_URL)%'
-            $evolutionInstanceName: '%env(WHATSAPP_EVOLUTION_INSTANCE)%'
-            $evolutionApiKey: '%env(WHATSAPP_EVOLUTION_API_KEY)%'
+            $evolutionGlobalApiKey: '%env(EVOLUTION_API_KEY)%'
+
+    App\Service\WhatsApp\EvolutionApiManager:
+        arguments:
+            $evolutionBaseUrl: '%env(WHATSAPP_EVOLUTION_BASE_URL)%'
+            $evolutionGlobalApiKey: '%env(EVOLUTION_API_KEY)%'
 
     App\Service\WhatsApp\WhatsAppServiceInterface: '@App\Service\WhatsApp\EvolutionApiWhatsAppService'
     # default configuration for services in *this* file
@@ -28,6 +32,7 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
             - '../src/Service/WhatsApp/EvolutionApiWhatsAppService.php'
+            - '../src/Service/WhatsApp/EvolutionApiManager.php'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

@@ -20,7 +20,7 @@ class AppointmentNotificationService
     {
         $shop = $appointment->getBarber()->getShop();
         $phone = $shop->getPhone();
-        if (!$phone || !$this->whatsApp->isEnabled()) {
+        if (!$phone || !$this->whatsApp->isEnabled($shop)) {
             return;
         }
 
@@ -37,7 +37,7 @@ class AppointmentNotificationService
         $message .= "Barbeiro: {$barberName}\n";
         $message .= "Status: pendente de confirmação.";
 
-        $this->sendSafe($phone, $message, 'notifyShopNewAppointment');
+        $this->sendSafe($shop, $phone, $message, 'notifyShopNewAppointment');
     }
 
     /**
@@ -46,7 +46,8 @@ class AppointmentNotificationService
     public function notifyClientAppointmentConfirmed(Appointment $appointment): void
     {
         $phone = $appointment->getPhone();
-        if (!$phone || !$this->whatsApp->isEnabled()) {
+        $shop = $appointment->getBarber()->getShop();
+        if (!$phone || !$this->whatsApp->isEnabled($shop)) {
             return;
         }
 
@@ -62,7 +63,7 @@ class AppointmentNotificationService
         $message .= "✂️ Serviço: {$serviceName}\n\n";
         $message .= "Te esperamos!";
 
-        $this->sendSafe($phone, $message, 'notifyClientAppointmentConfirmed');
+        $this->sendSafe($shop, $phone, $message, 'notifyClientAppointmentConfirmed');
     }
 
     /**
@@ -72,7 +73,7 @@ class AppointmentNotificationService
     {
         $shop = $appointment->getBarber()->getShop();
         $phone = $shop->getPhone();
-        if (!$phone || !$this->whatsApp->isEnabled()) {
+        if (!$phone || !$this->whatsApp->isEnabled($shop)) {
             return;
         }
 
@@ -88,13 +89,16 @@ class AppointmentNotificationService
         $message .= "Serviço: {$serviceName}\n";
         $message .= "Barbeiro: {$barberName}";
 
-        $this->sendSafe($phone, $message, 'notifyShopReminder');
+        $this->sendSafe($shop, $phone, $message, 'notifyShopReminder');
     }
 
-    private function sendSafe(string $phone, string $message, string $context): void
+    private function sendSafe(?\App\Entity\Shop $shop, string $phone, string $message, string $context): void
     {
+        if (!$shop) {
+            return;
+        }
         try {
-            $this->whatsApp->sendText($phone, $message);
+            $this->whatsApp->sendText($shop, $phone, $message);
             $this->logger->info('WhatsApp enviado', ['context' => $context, 'phone' => substr($phone, -4) . '****']);
         } catch (\Throwable $e) {
             $this->logger->error('Falha ao enviar WhatsApp: ' . $e->getMessage(), [

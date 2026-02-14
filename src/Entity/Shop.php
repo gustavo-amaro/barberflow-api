@@ -44,6 +44,15 @@ class Shop
     #[Groups(['shop:read', 'shop:write'])]
     private ?string $instagram = null;
 
+    /** Nome da instância na Evolution API (uma por barbearia). */
+    #[ORM\Column(length: 80, nullable: true)]
+    #[Groups(['shop:read', 'shop:write'])]
+    private ?string $evolutionInstanceName = null;
+
+    /** API Key da instância retornada pela Evolution ao criar. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $evolutionInstanceApiKey = null;
+
     #[ORM\OneToOne(inversedBy: 'shop', cascade: ['persist'])]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['shop:read'])]
@@ -158,6 +167,28 @@ class Shop
     public function setInstagram(?string $instagram): static
     {
         $this->instagram = $instagram;
+        return $this;
+    }
+
+    public function getEvolutionInstanceName(): ?string
+    {
+        return $this->evolutionInstanceName;
+    }
+
+    public function setEvolutionInstanceName(?string $evolutionInstanceName): static
+    {
+        $this->evolutionInstanceName = $evolutionInstanceName;
+        return $this;
+    }
+
+    public function getEvolutionInstanceApiKey(): ?string
+    {
+        return $this->evolutionInstanceApiKey;
+    }
+
+    public function setEvolutionInstanceApiKey(?string $evolutionInstanceApiKey): static
+    {
+        $this->evolutionInstanceApiKey = $evolutionInstanceApiKey;
         return $this;
     }
 

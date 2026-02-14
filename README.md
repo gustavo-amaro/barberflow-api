@@ -104,15 +104,15 @@ Se o MySQL já existia antes de adicionar o script de init, crie o banco manualm
 docker compose exec database mysql -u barberflow -pbarberflow123 -e "CREATE DATABASE IF NOT EXISTS evolution CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 ```
 
-Depois, acesse http://localhost:8084, crie uma instância (ex: `barberflow`) e escaneie o QR Code com o WhatsApp. No `.env` da API, use:
+No `.env` da API, use apenas a URL base (cada barbearia tem sua própria instância, configurada no painel):
 
 ```env
-WHATSAPP_EVOLUTION_BASE_URL=http://localhost:8084
-WHATSAPP_EVOLUTION_INSTANCE=barberflow
-WHATSAPP_EVOLUTION_API_KEY=evolution_secret_key
+WHATSAPP_EVOLUTION_BASE_URL=http://evolution_api:8080
 ```
 
-*(Se a API PHP rodar dentro do Docker, use `http://evolution_api:8080` em `WHATSAPP_EVOLUTION_BASE_URL`.)*
+*(Se a API PHP rodar no host, use `http://localhost:8084`.)*
+
+**Conexão por barbearia:** no painel admin, em **Configurações**, a barbearia clica em **Conectar WhatsApp**, escaneia o QR code com o celular e passa a receber e enviar notificações.
 
 ### Configuração (Evolution API externa)
 
@@ -121,11 +121,10 @@ WHATSAPP_EVOLUTION_API_KEY=evolution_secret_key
 
 ```env
 WHATSAPP_EVOLUTION_BASE_URL=https://sua-evolution-api.com
-WHATSAPP_EVOLUTION_INSTANCE=nome-da-sua-instancia
-WHATSAPP_EVOLUTION_API_KEY=sua-api-key
+EVOLUTION_API_KEY=sua-api-key-global
 ```
 
-3. **Cadastre o telefone da barbearia** no painel (Shop): o número é usado para receber “novo agendamento” e “lembrete em 30 min”.
+3. **Cadastre o telefone da barbearia** no painel (dados da barbearia): o número é usado para receber “novo agendamento” e “lembrete em 30 min”.
 4. Os clientes precisam informar o telefone no agendamento para receber a confirmação.
 
 ### Lembrete 30 minutos antes (cron)

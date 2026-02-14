@@ -2,32 +2,36 @@
 
 namespace App\Service\WhatsApp;
 
+use App\Entity\Shop;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 
 /**
  * Implementação usando Evolution API (https://evolution-api.com).
- * Requer uma instância configurada e conectada (QR ou número).
+ * Cada barbearia tem sua própria instância; envio usa a config da Shop.
  */
 class EvolutionApiWhatsAppService implements WhatsAppServiceInterface
 {
     public function __construct(
         private HttpClientInterface $httpClient,
         private string $evolutionBaseUrl,
-        private string $evolutionInstanceName,
-        private string $evolutionApiKey = '',
+        private string $evolutionGlobalApiKey = '',
     ) {
         $this->evolutionBaseUrl = rtrim($evolutionBaseUrl, '/');
     }
 
-    public function isEnabled(): bool
+    public function isEnabled(Shop $shop): bool
     {
-        return $this->evolutionBaseUrl !== '' && $this->evolutionInstanceName !== '';
+        if ($this->evolutionBaseUrl === '') {
+            return false;
+        }
+        $name = $shop->getEvolutionInstanceName();
+        return $name !== null && $name !== '';
     }
 
-    public function sendText(string $phone, string $message): bool
+    public function sendText(Shop $shop, string $phone, string $message): bool
     {
-        if (!$this->isEnabled()) {
+        if (!$this->isEnabled($shop)) {
             return false;
         }
 
@@ -36,12 +40,16 @@ class EvolutionApiWhatsAppService implements WhatsAppServiceInterface
             return false;
         }
 
-        $url = sprintf('%s/message/sendText/%s', $this->evolutionBaseUrl, $this->evolutionInstanceName);
+        $instanceName = $shop->getEvolutionInstanceName();
+        $url = sprintf('%s/message/sendText/%s', $this->evolutionBaseUrl, $instanceName);
         $headers = [
             'Content-Type' => 'application/json',
         ];
-        if ($this->evolutionApiKey !== '') {
-            $headers['apikey'] = $this->evolutionApiKey;
+        $apiKey = $shop->getEvolutionInstanceApiKey();
+        if ($apiKey !== null && $apiKey !== '') {
+            $headers['apikey'] = $apiKey;
+        } elseif ($this->evolutionGlobalApiKey !== '') {
+            $headers['apikey'] = $this->evolutionGlobalApiKey;
         }
 
         try {
