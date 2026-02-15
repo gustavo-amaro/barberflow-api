@@ -24,8 +24,8 @@ services:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
       DATABASE_URL: mysql://${DB_USER:-barberflow}:${DB_PASSWORD}@database:3306/${DB_NAME:-barberflow}?serverVersion=8.0&charset=utf8mb4
-      JWT_SECRET_KEY: %kernel.project_dir%/config/jwt/private.pem
-      JWT_PUBLIC_KEY: %kernel.project_dir%/config/jwt/public.pem
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       JWT_PASSPHRASE: ${JWT_PASSPHRASE}
       JWT_TOKEN_TTL: ${JWT_TOKEN_TTL:-3600}
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-'^https?://.*$'}
