@@ -1,0 +1,117 @@
+# Barberflow API - Deploy em VPS
+# Serviços: API (porta 80), MySQL, Evolution API (porta 8084), Redis
+#
+# Uso:
+#   1. Crie .env com APP_SECRET, DB_PASSWORD, JWT_PASSPHRASE, etc.
+#   2. Gere as chaves JWT em config/jwt/
+#   3. docker compose -f docker-compose.prod.yml build
+#   4. docker compose -f docker-compose.prod.yml up -d
+#   5. docker compose -f docker-compose.prod.yml run --rm api php bin/console doctrine:migrations:migrate --no-interaction
+
+version: "3.8"
+
+services:
+  api:
+    image: barberflow-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: barberflow_api
+    restart: unless-stopped
+    ports:
+      - "8083:80"
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: mysql://${DB_USER:-barberflow}:${DB_PASSWORD}@database:3306/${DB_NAME:-barberflow}?serverVersion=8.0&charset=utf8mb4
+      JWT_SECRET_KEY: %kernel.project_dir%/config/jwt/private.pem
+      JWT_PUBLIC_KEY: %kernel.project_dir%/config/jwt/public.pem
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      JWT_TOKEN_TTL: ${JWT_TOKEN_TTL:-3600}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-'^https?://.*$'}
+      WHATSAPP_EVOLUTION_BASE_URL: ${WHATSAPP_EVOLUTION_BASE_URL:-http://evolution_api:8080}
+    volumes:
+      # Chaves JWT (geradas na VPS; somente leitura)
+      - ./config/jwt:/var/www/config/jwt:ro
+    networks:
+      - barberflow_network
+    depends_on:
+      database:
+        condition: service_healthy
+
+  database:
+    image: mysql:8.0
+    container_name: barberflow_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB_NAME:-barberflow}
+      MYSQL_USER: ${DB_USER:-barberflow}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - barberflow_db_data:/var/lib/mysql
+      - ./docker/mysql/init-evolution.sql:/docker-entrypoint-initdb.d/02-evolution.sql:ro
+    networks:
+      - barberflow_network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uroot",
+          "-p$$MYSQL_ROOT_PASSWORD",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password
+
+  # Redis (cache da Evolution API)
+  evolution_redis:
+    image: redis:7-alpine
+    container_name: barberflow_evolution_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - evolution_redis_data:/data
+    networks:
+      - barberflow_network
+
+  # Evolution API (WhatsApp) - porta 8084
+  evolution_api:
+    image: evoapicloud/evolution-api:latest
+    container_name: barberflow_evolution_api
+    restart: unless-stopped
+    ports:
+      - "8084:8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - barberflow_network
+    depends_on:
+      - database
+      - evolution_redis
+    environment:
+      SERVER_PORT: "8080"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: mysql
+      DATABASE_CONNECTION_URI: mysql://${DB_USER:-barberflow}:${DB_PASSWORD}@database:3306/evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution_redis:6379
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-evolution_secret_key}
+      LOG_LEVEL: ERROR,WARN,INFO
+
+networks:
+  barberflow_network:
+    driver: bridge
+
+volumes:
+  barberflow_db_data:
+    driver: local
+  evolution_redis_data:
+    driver: local
+  evolution_instances:
+    driver: local

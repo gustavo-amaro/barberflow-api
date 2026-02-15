@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Ambiente e segredos (nunca na imagem)
+.env
+.env.*
+!.env.example
+
+# Dependências (instaladas no build)
+/vendor/
+
+# Cache e logs
+/var/
+*.log
+
+# IDE e OS
+.idea
+.vscode
+.cursor
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testes e ferramentas de dev
+/tests/
+phpunit.xml
+.phpunit.result.cache
+phpstan.neon
+composer.phar
+
+# Documentação local (opcional manter no build)
+# /docs/
+
+# Chaves JWT (gerar ou montar no deploy)
+/config/jwt/*.pem
+/config/secrets/
+
+# Docker local (evitar recursão; usamos só o que precisamos no Dockerfile)
+docker-compose.override.yml
+Dockerfile
+.dockerignore
+
+# Build
+/build/
+
+# README e demais (reduzir tamanho; opcional)
+# README.md
