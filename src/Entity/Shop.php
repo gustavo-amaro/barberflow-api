@@ -82,6 +82,12 @@ class Shop
     #[ORM\OneToMany(targetEntity: Client::class, mappedBy: 'shop', orphanRemoval: true)]
     private Collection $clients;
 
+    /**
+     * @var Collection<int, ShopSchedule>
+     */
+    #[ORM\OneToMany(targetEntity: ShopSchedule::class, mappedBy: 'shop', orphanRemoval: true, cascade: ['persist', 'remove'])]
+    private Collection $schedules;
+
     #[ORM\Column]
     #[Groups(['shop:read'])]
     private ?\DateTimeImmutable $createdAt = null;
@@ -96,6 +102,7 @@ class Shop
         $this->services = new ArrayCollection();
         $this->products = new ArrayCollection();
         $this->clients = new ArrayCollection();
+        $this->schedules = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -306,6 +313,33 @@ class Shop
         if ($this->clients->removeElement($client)) {
             if ($client->getShop() === $this) {
                 $client->setShop(null);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, ShopSchedule>
+     */
+    public function getSchedules(): Collection
+    {
+        return $this->schedules;
+    }
+
+    public function addSchedule(ShopSchedule $schedule): static
+    {
+        if (!$this->schedules->contains($schedule)) {
+            $this->schedules->add($schedule);
+            $schedule->setShop($this);
+        }
+        return $this;
+    }
+
+    public function removeSchedule(ShopSchedule $schedule): static
+    {
+        if ($this->schedules->removeElement($schedule)) {
+            if ($schedule->getShop() === $this) {
+                $schedule->setShop(null);
             }
         }
         return $this;

@@ -5,8 +5,10 @@ namespace App\Controller\Api;
 use App\Entity\Appointment;
 use App\Entity\Client;
 use App\Entity\Shop;
+use App\Entity\ShopSchedule;
 use App\Entity\User;
 use App\Repository\AppointmentRepository;
+use App\Repository\ShopScheduleRepository;
 use App\Service\AppointmentNotificationService;
 use App\Repository\BarberRepository;
 use App\Repository\ClientRepository;
@@ -35,7 +37,8 @@ class ShopController extends AbstractController
         private SerializerInterface $serializer,
         private ValidatorInterface $validator,
         private AppointmentNotificationService $appointmentNotification,
-        private AppointmentSlotService $slotService
+        private AppointmentSlotService $slotService,
+        private ShopScheduleRepository $scheduleRepository
     ) {}
 
     #[Route('', name: 'api_shop_create', methods: ['POST'])]
@@ -85,6 +88,91 @@ class ShopController extends AbstractController
             $this->serializer->normalize($shop, null, ['groups' => 'shop:read']),
             Response::HTTP_CREATED
         );
+    }
+
+    #[Route('/schedule', name: 'api_shop_schedule_show', methods: ['GET'])]
+    public function scheduleShow(): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        $shop = $user->getShop();
+        if (!$shop) {
+            return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $existing = $this->scheduleRepository->findByShopOrderedByDay($shop);
+        $scheduleConfigured = count($existing) > 0;
+        $byDay = [];
+        foreach ($existing as $s) {
+            $byDay[$s->getDayOfWeek()] = $s;
+        }
+        $schedule = [];
+        for ($day = 0; $day <= 6; $day++) {
+            $s = $byDay[$day] ?? null;
+            $schedule[] = [
+                'dayOfWeek' => $day,
+                'isOpen' => $s ? $s->isOpen() : ($day >= 1 && $day <= 5),
+                'timeOpen' => $s && $s->getTimeOpen() ? $s->getTimeOpen()->format('H:i') : '09:00',
+                'timeClose' => $s && $s->getTimeClose() ? $s->getTimeClose()->format('H:i') : '18:00',
+            ];
+        }
+        return $this->json(['schedule' => $schedule, 'scheduleConfigured' => $scheduleConfigured]);
+    }
+
+    #[Route('/schedule', name: 'api_shop_schedule_update', methods: ['PUT', 'PATCH'])]
+    public function scheduleUpdate(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        $shop = $user->getShop();
+        if (!$shop) {
+            return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $items = $data['schedule'] ?? $data ?? [];
+        if (!\is_array($items) || count($items) < 7) {
+            return $this->json(['error' => 'Envie os 7 dias (domingo a sábado) em schedule'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $existing = $this->scheduleRepository->findByShopOrderedByDay($shop);
+        $byDay = [];
+        foreach ($existing as $s) {
+            $byDay[$s->getDayOfWeek()] = $s;
+        }
+
+        for ($day = 0; $day <= 6; $day++) {
+            $item = null;
+            foreach ($items as $i) {
+                if ((int) ($i['dayOfWeek'] ?? -1) === $day) {
+                    $item = $i;
+                    break;
+                }
+            }
+            if ($item === null) {
+                continue;
+            }
+            $isOpen = (bool) ($item['isOpen'] ?? true);
+            $timeOpen = $item['timeOpen'] ?? '09:00';
+            $timeClose = $item['timeClose'] ?? '18:00';
+            $schedule = $byDay[$day] ?? null;
+            if (!$schedule) {
+                $schedule = new ShopSchedule();
+                $schedule->setShop($shop);
+                $schedule->setDayOfWeek($day);
+                $this->entityManager->persist($schedule);
+            }
+            $schedule->setIsOpen($isOpen);
+            try {
+                $schedule->setTimeOpen($isOpen ? new \DateTime($timeOpen) : null);
+                $schedule->setTimeClose($isOpen ? new \DateTime($timeClose) : null);
+            } catch (\Exception) {
+                $schedule->setTimeOpen(new \DateTime('09:00'));
+                $schedule->setTimeClose(new \DateTime('18:00'));
+            }
+        }
+        $this->entityManager->flush();
+        return $this->scheduleShow();
     }
 
     #[Route('', name: 'api_shop_show', methods: ['GET'])]

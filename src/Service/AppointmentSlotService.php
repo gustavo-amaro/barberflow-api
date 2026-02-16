@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\Barber;
 use App\Repository\AppointmentRepository;
+use App\Repository\ShopScheduleRepository;
 
 class AppointmentSlotService
 {
@@ -11,26 +12,50 @@ class AppointmentSlotService
     private const SLOT_INTERVAL = 30;
 
     /** Horário padrão início (quando barbeiro não tem workStart). */
-    private const DEFAULT_START = '09:00';
+    private const DEFAULT_START = '08:00';
 
     /** Horário padrão fim (quando barbeiro não tem workEnd). */
-    private const DEFAULT_END = '20:00';
+    private const DEFAULT_END = '18:00';
 
     public function __construct(
-        private AppointmentRepository $appointmentRepository
+        private AppointmentRepository $appointmentRepository,
+        private ShopScheduleRepository $shopScheduleRepository
     ) {}
 
     /**
      * Retorna lista de slots para o barbeiro na data informada.
+     * Considera: horário de funcionamento da barbearia no dia da semana,
+     * horário do barbeiro, ocupados e horários no passado.
      * Cada slot tem: time (HH:MM), available (bool).
-     * Horários no passado (quando data é hoje) e já ocupados ficam available=false.
      *
      * @return array<int, array{time: string, available: bool}>
      */
     public function getSlotsForBarberAndDate(Barber $barber, \DateTimeInterface $date): array
     {
-        $start = $this->getStartTime($barber);
-        $end = $this->getEndTime($barber);
+        $barberStart = $this->getStartTime($barber);
+        $barberEnd = $this->getEndTime($barber);
+
+        $shop = $barber->getShop();
+        $dayOfWeek = (int) $date->format('w'); // 0=domingo a 6=sábado
+        $shopSchedule = $shop ? $this->shopScheduleRepository->findOneByShopAndDay($shop, $dayOfWeek) : null;
+
+        if ($shopSchedule !== null && !$shopSchedule->isOpen()) {
+            return [];
+        }
+
+        if ($shopSchedule !== null && $shopSchedule->getTimeOpen() && $shopSchedule->getTimeClose()) {
+            $shopOpen = $shopSchedule->getTimeOpen()->format('H:i');
+            $shopClose = $shopSchedule->getTimeClose()->format('H:i');
+            $start = $this->timeMax($barberStart, $shopOpen);
+            $end = $this->timeMin($barberEnd, $shopClose);
+            if ($start >= $end) {
+                return [];
+            }
+        } else {
+            $start = $barberStart;
+            $end = $barberEnd;
+        }
+
         $slots = $this->generateTimeSlots($start, $end);
 
         $occupied = $this->getOccupiedTimes($barber, $date);
@@ -117,5 +142,25 @@ class AppointmentSlotService
             }
         }
         return $times;
+    }
+
+    private function timeMax(string $a, string $b): string
+    {
+        $tA = \DateTime::createFromFormat('H:i', $a);
+        $tB = \DateTime::createFromFormat('H:i', $b);
+        if (!$tA || !$tB) {
+            return $a;
+        }
+        return $tA >= $tB ? $a : $b;
+    }
+
+    private function timeMin(string $a, string $b): string
+    {
+        $tA = \DateTime::createFromFormat('H:i', $a);
+        $tB = \DateTime::createFromFormat('H:i', $b);
+        if (!$tA || !$tB) {
+            return $a;
+        }
+        return $tA <= $tB ? $a : $b;
     }
 }
