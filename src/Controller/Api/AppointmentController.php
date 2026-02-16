@@ -10,6 +10,7 @@ use App\Repository\BarberRepository;
 use App\Repository\ClientRepository;
 use App\Repository\ServiceRepository;
 use App\Service\AppointmentNotificationService;
+use App\Service\AppointmentSlotService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -30,7 +31,8 @@ class AppointmentController extends AbstractController
         private ClientRepository $clientRepository,
         private SerializerInterface $serializer,
         private ValidatorInterface $validator,
-        private AppointmentNotificationService $appointmentNotification
+        private AppointmentNotificationService $appointmentNotification,
+        private AppointmentSlotService $slotService
     ) {}
 
     #[Route('', name: 'api_appointments_index', methods: ['GET'])]
@@ -117,6 +119,38 @@ class AppointmentController extends AbstractController
         );
     }
 
+    #[Route('/available-slots', name: 'api_appointments_available_slots', methods: ['GET'])]
+    public function availableSlots(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        $shop = $user->getShop();
+
+        if (!$shop) {
+            return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $barberId = (int) ($request->query->get('barber_id') ?? 0);
+        $dateStr = $request->query->get('date');
+        if (!$barberId || !$dateStr) {
+            return $this->json(['error' => 'barber_id e date são obrigatórios'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $barber = $this->barberRepository->find($barberId);
+        if (!$barber || $barber->getShop()->getId() !== $shop->getId()) {
+            return $this->json(['error' => 'Barbeiro não encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $date = new \DateTime($dateStr);
+        } catch (\Exception) {
+            return $this->json(['error' => 'Data inválida'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $slots = $this->slotService->getSlotsForBarberAndDate($barber, $date);
+        return $this->json(['slots' => $slots]);
+    }
+
     #[Route('', name: 'api_appointments_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
@@ -148,6 +182,12 @@ class AppointmentController extends AbstractController
 
         $aptDate = new \DateTime($data['date'] ?? 'today');
         $aptTime = new \DateTime($data['time'] ?? 'now');
+        if ($this->slotService->isPast($aptDate, $aptTime)) {
+            return $this->json(
+                ['error' => 'Não é possível agendar horário no passado. Escolha uma data e horário futuros.'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
         $existing = $this->appointmentRepository->findOneByBarberAndDateTime($barber, $aptDate, $aptTime);
         if ($existing) {
             return $this->json(

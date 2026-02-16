@@ -30,7 +30,7 @@ class AppointmentNotificationService
         $serviceName = $appointment->getService()?->getName() ?? 'Serviço';
         $barberName = $appointment->getBarber()?->getName() ?? 'Barbeiro';
 
-        $message = "🆕 *Novo agendamento (Barberflow)*\n\n";
+        $message = "🆕 *Novo agendamento*\n\n";
         $message .= "Cliente: *{$clientName}*\n";
         $message .= "Data: {$date} às {$time}\n";
         $message .= "Serviço: {$serviceName}\n";

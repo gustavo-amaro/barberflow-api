@@ -1,3 +1,6 @@
+# CORS: com origin_regex: true o valor é tratado como REGEX (não use * literal).
+# Qualquer origem: ^https?://.*
+# Só seu site: ^https?://(www\.)?linkdobarbeiro\.com\.br$
 nelmio_cors:
     defaults:
         origin_regex: true
