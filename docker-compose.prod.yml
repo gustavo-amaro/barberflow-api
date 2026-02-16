@@ -8,8 +8,6 @@
 #   4. docker compose -f docker-compose.prod.yml up -d
 #   5. docker compose -f docker-compose.prod.yml run --rm api php bin/console doctrine:migrations:migrate --no-interaction
 
-version: "3.8"
-
 services:
   api:
     image: barberflow-api:latest
@@ -31,6 +29,8 @@ services:
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-'^https?://.*$'}
       WHATSAPP_EVOLUTION_BASE_URL: ${WHATSAPP_EVOLUTION_BASE_URL:-http://evolution_api:8080}
     volumes:
+      # .env do host (Symfony/console precisa ler)
+      - ./.env:/var/www/.env:ro
       # Chaves JWT (geradas na VPS; somente leitura)
       - ./config/jwt:/var/www/config/jwt:ro
     networks:
