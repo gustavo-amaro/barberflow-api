@@ -10,11 +10,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class AsaasService
 {
-    /** Valor por parcela mensal; semestral = 6x, anual = 12x */
+    /** Parcela única por ciclo: mensal 1x/mês, semestral 1x/6 meses, anual 1x/12 meses */
     private const PLANS = [
-        'mensal'     => ['amount' => 40.00, 'description' => 'Link do Barbeiro - Plano Mensal', 'cycle' => 'MONTHLY', 'maxPayments' => null],
-        'semestral'  => ['amount' => 34.00, 'description' => 'Link do Barbeiro - Plano Semestral (6x)', 'cycle' => 'MONTHLY', 'maxPayments' => 6],
-        'anual'      => ['amount' => 28.00, 'description' => 'Link do Barbeiro - Plano Anual (12x)', 'cycle' => 'MONTHLY', 'maxPayments' => 12],
+        'mensal'     => ['amount' => 40.00, 'description' => 'Link do Barbeiro - Plano Mensal', 'cycle' => 'MONTHLY'],
+        'semestral'  => ['amount' => 204.00, 'description' => 'Link do Barbeiro - Plano Semestral', 'cycle' => 'SEMIANNUALLY'],
+        'anual'      => ['amount' => 336.00, 'description' => 'Link do Barbeiro - Plano Anual', 'cycle' => 'YEARLY'],
     ];
 
     public function __construct(
@@ -86,11 +86,6 @@ class AsaasService
             'cycle'        => $planConfig['cycle'],
             'description'  => $planConfig['description'],
             'externalReference' => (string) $shop->getId(),
-        ];
-        if (isset($planConfig['maxPayments']) && $planConfig['maxPayments'] !== null) {
-            $body['maxPayments'] = $planConfig['maxPayments'];
-        }
-        $body = array_merge($body, [
             'creditCard'   => [
                 'holderName'  => $data['cardHolderName'],
                 'number'      => preg_replace('/\D/', '', $data['cardNumber']),
@@ -109,7 +104,7 @@ class AsaasService
                 'mobilePhone'        => isset($data['mobilePhone']) && $data['mobilePhone'] !== '' ? preg_replace('/\D/', '', $data['mobilePhone']) : null,
             ],
             'remoteIp' => $data['remoteIp'],
-        ]);
+        ];
 
         $baseURL = $this->asaasClientService->getBaseURL();
         $response = $this->httpClient->request('POST', $baseURL . 'subscriptions', [
@@ -184,8 +179,7 @@ class AsaasService
             return false;
         }
 
-        // Cada pagamento = 1 mês (todos os planos cobram em parcelas mensais)
-        $endsAt = $this->computeSubscriptionEndsAtForPayment($shop->getSubscriptionEndsAt());
+        $endsAt = $this->computeSubscriptionEndsAt($plan, $shop->getSubscriptionEndsAt());
         $shop->setSubscriptionEndsAt($endsAt);
         $this->em->flush();
 
@@ -206,7 +200,6 @@ class AsaasService
         return true;
     }
 
-    /** Data de fim ao criar a assinatura (primeira cobrança já cobre 1 mês). */
     private function computeSubscriptionEndsAt(string $plan, ?\DateTimeImmutable $currentEndsAt): \DateTimeImmutable
     {
         $now = new \DateTimeImmutable();
@@ -218,14 +211,5 @@ class AsaasService
             'anual'     => $from->modify('+12 months'),
             default     => $from->modify('+1 month'),
         };
-    }
-
-    /** A cada pagamento recebido (webhook), estende 1 mês (cobrança mensal). */
-    private function computeSubscriptionEndsAtForPayment(?\DateTimeImmutable $currentEndsAt): \DateTimeImmutable
-    {
-        $now = new \DateTimeImmutable();
-        $from = $currentEndsAt && $currentEndsAt > $now ? $currentEndsAt : $now;
-
-        return $from->modify('+1 month');
     }
 }
