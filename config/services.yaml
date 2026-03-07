@@ -34,5 +34,10 @@ services:
             - '../src/Service/WhatsApp/EvolutionApiWhatsAppService.php'
             - '../src/Service/WhatsApp/EvolutionApiManager.php'
 
+    # ASAAS webhook: valida header asaas-access-token quando ASAAS_WEBHOOK_TOKEN estiver definido
+    App\Controller\Api\AsaasWebhookController:
+        arguments:
+            $webhookToken: '%env(default::ASAAS_WEBHOOK_TOKEN)%'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

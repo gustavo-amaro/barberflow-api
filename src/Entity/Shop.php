@@ -96,6 +96,24 @@ class Shop
     #[Groups(['shop:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
+    /** Plano ativo: trial, mensal, semestral, anual */
+    #[ORM\Column(length: 20, nullable: true)]
+    #[Groups(['shop:read'])]
+    private ?string $subscriptionPlan = null;
+
+    /** Data até quando a assinatura está ativa */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['shop:read'])]
+    private ?\DateTimeImmutable $subscriptionEndsAt = null;
+
+    /** ID da assinatura no ASAAS (cartão recorrente) */
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $asaasSubscriptionId = null;
+
+    /** ID do cliente no ASAAS */
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $asaasCustomerId = null;
+
     public function __construct()
     {
         $this->barbers = new ArrayCollection();
@@ -343,6 +361,62 @@ class Shop
             }
         }
         return $this;
+    }
+
+    public function getSubscriptionPlan(): ?string
+    {
+        return $this->subscriptionPlan;
+    }
+
+    public function setSubscriptionPlan(?string $subscriptionPlan): static
+    {
+        $this->subscriptionPlan = $subscriptionPlan;
+        return $this;
+    }
+
+    public function getSubscriptionEndsAt(): ?\DateTimeImmutable
+    {
+        return $this->subscriptionEndsAt;
+    }
+
+    public function setSubscriptionEndsAt(?\DateTimeImmutable $subscriptionEndsAt): static
+    {
+        $this->subscriptionEndsAt = $subscriptionEndsAt;
+        return $this;
+    }
+
+    public function getAsaasSubscriptionId(): ?string
+    {
+        return $this->asaasSubscriptionId;
+    }
+
+    public function setAsaasSubscriptionId(?string $asaasSubscriptionId): static
+    {
+        $this->asaasSubscriptionId = $asaasSubscriptionId;
+        return $this;
+    }
+
+    public function getAsaasCustomerId(): ?string
+    {
+        return $this->asaasCustomerId;
+    }
+
+    public function setAsaasCustomerId(?string $asaasCustomerId): static
+    {
+        $this->asaasCustomerId = $asaasCustomerId;
+        return $this;
+    }
+
+    /** Assinatura está ativa: sem data de fim (trial) ou data de fim >= hoje. */
+    public function isSubscriptionActive(): bool
+    {
+        $endsAt = $this->subscriptionEndsAt;
+        if ($endsAt === null) {
+            return true; // trial ou nunca assinou (acesso liberado)
+        }
+        $today = new \DateTimeImmutable('today');
+
+        return $endsAt >= $today;
     }
 
     public function getCreatedAt(): ?\DateTimeImmutable
