@@ -200,6 +200,40 @@ class AsaasService
         return true;
     }
 
+    /**
+     * Cancela assinatura recorrente no ASAAS. Remove cobranças futuras.
+     * O usuário mantém acesso até subscriptionEndsAt.
+     */
+    public function cancelSubscription(string $subscriptionId): bool
+    {
+        $shop = $this->em->getRepository(Shop::class)->findOneBy(['asaasSubscriptionId' => $subscriptionId]);
+        if (!$shop) {
+            throw new \InvalidArgumentException('Assinatura não encontrada.');
+        }
+
+        $baseURL = $this->asaasClientService->getBaseURL();
+        $response = $this->httpClient->request('DELETE', $baseURL . 'subscriptions/' . $subscriptionId, [
+            'timeout' => 15,
+            'headers' => [
+                'accept'       => 'application/json',
+                'content-type' => 'application/json',
+                'access_token' => $this->asaasClientService->getAccessToken(),
+            ],
+        ]);
+
+        if ($response->getStatusCode() !== Response::HTTP_OK) {
+            $err = $response->toArray(false);
+            $msg = $err['errors'][0]['description'] ?? 'Erro ao cancelar assinatura no ASAAS';
+            throw new \RuntimeException($msg, $response->getStatusCode());
+        }
+
+        $shop->setAsaasSubscriptionId(null);
+        $shop->setAsaasCustomerId(null);
+        $this->em->flush();
+
+        return true;
+    }
+
     private function computeSubscriptionEndsAt(string $plan, ?\DateTimeImmutable $currentEndsAt): \DateTimeImmutable
     {
         $now = new \DateTimeImmutable();

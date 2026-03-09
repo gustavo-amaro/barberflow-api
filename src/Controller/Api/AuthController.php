@@ -96,6 +96,7 @@ class AuthController extends AbstractController
                 'subscriptionPlan' => $user->getShop()->getSubscriptionPlan(),
                 'subscriptionEndsAt' => $user->getShop()->getSubscriptionEndsAt()?->format(\DateTimeInterface::ATOM),
                 'subscriptionActive' => $user->getShop()->isSubscriptionActive(),
+                'asaasSubscriptionId' => $user->getShop()->getAsaasSubscriptionId(),
             ] : null,
         ]);
     }

@@ -117,4 +117,39 @@ class PaymentController extends AbstractController
             return $this->json(['error' => 'Erro ao processar cartão de crédito.'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
+    /**
+     * Cancela assinatura recorrente (cartão ASAAS). O usuário mantém acesso até o fim do período já pago.
+     */
+    #[Route('/subscription/cancel', name: 'api_payment_subscription_cancel', methods: ['POST'])]
+    public function cancelSubscription(): JsonResponse
+    {
+        /** @var User|null $user */
+        $user = $this->getUser();
+        if (!$user) {
+            return $this->json(['error' => 'Não autenticado'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $shop = $user->getShop();
+        if (!$shop) {
+            return $this->json(['error' => 'Nenhuma barbearia vinculada'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $subscriptionId = $shop->getAsaasSubscriptionId();
+        if (!$subscriptionId) {
+            return $this->json(['error' => 'Não há assinatura recorrente para cancelar.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $this->asaasService->cancelSubscription($subscriptionId);
+            return $this->json(['success' => true, 'message' => 'Assinatura cancelada. Você mantém acesso até o fim do período já pago.']);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            $code = $e->getCode() && \is_int($e->getCode()) ? $e->getCode() : Response::HTTP_INTERNAL_SERVER_ERROR;
+            return $this->json(['error' => $e->getMessage()], $code);
+        } catch (\Throwable $e) {
+            return $this->json(['error' => 'Erro ao cancelar assinatura.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
 }

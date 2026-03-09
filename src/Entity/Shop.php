@@ -106,8 +106,9 @@ class Shop
     #[Groups(['shop:read'])]
     private ?\DateTimeImmutable $subscriptionEndsAt = null;
 
-    /** ID da assinatura no ASAAS (cartão recorrente) */
+    /** ID da assinatura no ASAAS (cartão recorrente). Se preenchido, o usuário pode cancelar. */
     #[ORM\Column(length: 100, nullable: true)]
+    #[Groups(['shop:read'])]
     private ?string $asaasSubscriptionId = null;
 
     /** ID do cliente no ASAAS */
