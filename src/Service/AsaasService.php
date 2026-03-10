@@ -61,6 +61,14 @@ class AsaasService
             throw new \InvalidArgumentException('Barbearia não encontrada ou não pertence ao usuário.');
         }
 
+        $oldSubscriptionId = $shop->getAsaasSubscriptionId();
+        if ($oldSubscriptionId !== null && $oldSubscriptionId !== '') {
+            $this->cancelSubscriptionInAsaas($oldSubscriptionId);
+            $shop->setAsaasSubscriptionId(null);
+            $shop->setAsaasCustomerId(null);
+            $this->em->flush();
+        }
+
         $planConfig = self::PLANS[$plan];
         $amount = (float) $planConfig['amount'];
 
@@ -211,6 +219,20 @@ class AsaasService
             throw new \InvalidArgumentException('Assinatura não encontrada.');
         }
 
+        $this->cancelSubscriptionInAsaas($subscriptionId);
+        $shop->setAsaasSubscriptionId(null);
+        $shop->setAsaasCustomerId(null);
+        $this->em->flush();
+
+        return true;
+    }
+
+    /**
+     * Chama o ASAAS para remover a assinatura (só a API, não altera a Shop).
+     * Se a assinatura já não existir (404), ignora para não falhar troca de plano.
+     */
+    private function cancelSubscriptionInAsaas(string $subscriptionId): void
+    {
         $baseURL = $this->asaasClientService->getBaseURL();
         $response = $this->httpClient->request('DELETE', $baseURL . 'subscriptions/' . $subscriptionId, [
             'timeout' => 15,
@@ -221,17 +243,16 @@ class AsaasService
             ],
         ]);
 
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-            $err = $response->toArray(false);
-            $msg = $err['errors'][0]['description'] ?? 'Erro ao cancelar assinatura no ASAAS';
-            throw new \RuntimeException($msg, $response->getStatusCode());
+        $status = $response->getStatusCode();
+        if ($status === Response::HTTP_OK) {
+            return;
         }
-
-        $shop->setAsaasSubscriptionId(null);
-        $shop->setAsaasCustomerId(null);
-        $this->em->flush();
-
-        return true;
+        if ($status === Response::HTTP_NOT_FOUND) {
+            return;
+        }
+        $err = $response->toArray(false);
+        $msg = $err['errors'][0]['description'] ?? 'Erro ao cancelar assinatura no ASAAS';
+        throw new \RuntimeException($msg, $status);
     }
 
     private function computeSubscriptionEndsAt(string $plan, ?\DateTimeImmutable $currentEndsAt): \DateTimeImmutable
