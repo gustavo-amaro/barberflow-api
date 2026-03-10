@@ -21,8 +21,7 @@ class AsaasService
         private EntityManagerInterface $em,
         private HttpClientInterface $httpClient,
         private AsaasClientService $asaasClientService
-    ) {
-    }
+    ) {}
 
     /**
      * Cria assinatura recorrente com cartão no ASAAS e ativa o plano na Shop.
@@ -64,6 +63,11 @@ class AsaasService
         $planConfig = self::PLANS[$plan];
         $amount = (float) $planConfig['amount'];
 
+        $postalCode = preg_replace('/\D/', '', $data['postalCode'] ?? '');
+        if (strlen($postalCode) !== 8) {
+            throw new \InvalidArgumentException('CEP é obrigatório e deve conter 8 dígitos.');
+        }
+
         $clientData = $this->asaasClientService->findOrCreateClient([
             'name'    => $data['name'] ?? 'Cliente',
             'cpfCnpj' => $data['cpfCnpj'],
@@ -102,7 +106,7 @@ class AsaasService
                 'name'               => $data['name'] ?? $data['cardHolderName'],
                 'email'              => $data['email'],
                 'cpfCnpj'            => preg_replace('/\D/', '', $data['cpfCnpj']),
-                'postalCode'         => preg_replace('/\D/', '', $data['postalCode'] ?? '') ?: '00000000',
+                'postalCode'         => $postalCode,
                 'addressNumber'      => $data['addressNumber'] ?? 'S/N',
                 'addressComplement'  => $data['addressComplement'] ?? null,
                 'phone'              => preg_replace('/\D/', '', $data['phone'] ?? '') ?: '00000000000',
