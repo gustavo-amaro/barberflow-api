@@ -74,6 +74,7 @@ class ServiceController extends AbstractController
         $service->setDuration($data['duration'] ?? 0);
         $service->setPrice($data['price'] ?? '0.00');
         $service->setIcon($data['icon'] ?? null);
+        $service->setImage($data['image'] ?? null);
         $service->setDescription($data['description'] ?? null);
         $service->setCategory($data['category'] ?? null);
         $service->setActive($data['active'] ?? true);
@@ -154,6 +155,9 @@ class ServiceController extends AbstractController
         }
         if (array_key_exists('icon', $data)) {
             $service->setIcon($data['icon']);
+        }
+        if (array_key_exists('image', $data)) {
+            $service->setImage($data['image']);
         }
         if (array_key_exists('description', $data)) {
             $service->setDescription($data['description']);

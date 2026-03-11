@@ -47,6 +47,11 @@ class Service
     #[Groups(['service:read', 'service:write'])]
     private ?string $icon = null;
 
+    /** Caminho da imagem do serviço (ex: uploads/xxx.jpg). */
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['service:read', 'service:write'])]
+    private ?string $image = null;
+
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['service:read', 'service:write'])]
     private ?string $description = null;
@@ -151,6 +156,17 @@ class Service
     public function setIcon(?string $icon): static
     {
         $this->icon = $icon;
+        return $this;
+    }
+
+    public function getImage(): ?string
+    {
+        return $this->image;
+    }
+
+    public function setImage(?string $image): static
+    {
+        $this->image = $image;
         return $this;
     }
 
