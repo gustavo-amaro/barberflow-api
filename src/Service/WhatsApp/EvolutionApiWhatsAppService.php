@@ -8,7 +8,8 @@ use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 
 /**
  * Implementação usando Evolution API (https://evolution-api.com).
- * Cada barbearia tem sua própria instância; envio usa a config da Shop.
+ * Mensagens para a barbearia: instância global (EVOLUTION_GLOBAL_INSTANCE).
+ * Mensagens para o cliente: instância da barbearia.
  */
 class EvolutionApiWhatsAppService implements WhatsAppServiceInterface
 {
@@ -16,6 +17,7 @@ class EvolutionApiWhatsAppService implements WhatsAppServiceInterface
         private HttpClientInterface $httpClient,
         private string $evolutionBaseUrl,
         private string $evolutionGlobalApiKey = '',
+        private string $evolutionGlobalInstance = '',
     ) {
         $this->evolutionBaseUrl = rtrim($evolutionBaseUrl, '/');
     }
@@ -29,10 +31,32 @@ class EvolutionApiWhatsAppService implements WhatsAppServiceInterface
         return $name !== null && $name !== '';
     }
 
-    public function sendText(Shop $shop, string $phone, string $message): bool
+    /**
+     * Indica se a instância global está configurada para enviar mensagens à barbearia.
+     */
+    public function canSendToShop(): bool
     {
-        if (!$this->isEnabled($shop)) {
-            return false;
+        return $this->evolutionBaseUrl !== ''
+            && $this->evolutionGlobalInstance !== '';
+    }
+
+    public function sendText(Shop $shop, string $phone, string $message, bool $toShop = false): bool
+    {
+        if ($toShop) {
+            if (!$this->canSendToShop()) {
+                return false;
+            }
+            $instanceName = $this->evolutionGlobalInstance;
+            $apiKey = $this->evolutionGlobalApiKey;
+        } else {
+            if (!$this->isEnabled($shop)) {
+                return false;
+            }
+            $instanceName = $shop->getEvolutionInstanceName();
+            $apiKey = $shop->getEvolutionInstanceApiKey();
+            if ($apiKey === null || $apiKey === '') {
+                $apiKey = $this->evolutionGlobalApiKey;
+            }
         }
 
         $phone = $this->normalizePhone($phone);
@@ -40,16 +64,12 @@ class EvolutionApiWhatsAppService implements WhatsAppServiceInterface
             return false;
         }
 
-        $instanceName = $shop->getEvolutionInstanceName();
         $url = sprintf('%s/message/sendText/%s', $this->evolutionBaseUrl, $instanceName);
         $headers = [
             'Content-Type' => 'application/json',
         ];
-        $apiKey = $shop->getEvolutionInstanceApiKey();
-        if ($apiKey !== null && $apiKey !== '') {
+        if ($apiKey !== '') {
             $headers['apikey'] = $apiKey;
-        } elseif ($this->evolutionGlobalApiKey !== '') {
-            $headers['apikey'] = $this->evolutionGlobalApiKey;
         }
 
         try {

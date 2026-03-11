@@ -439,6 +439,7 @@ class AppointmentController extends AbstractController
 
         $appointment->cancel();
         $this->entityManager->flush();
+        $this->appointmentNotification->notifyClientAppointmentCancelled($appointment);
 
         return $this->json(
             $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read'])

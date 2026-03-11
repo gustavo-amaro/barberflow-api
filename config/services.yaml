@@ -11,6 +11,7 @@ services:
         arguments:
             $evolutionBaseUrl: '%env(WHATSAPP_EVOLUTION_BASE_URL)%'
             $evolutionGlobalApiKey: '%env(EVOLUTION_API_KEY)%'
+            $evolutionGlobalInstance: '%env(default::EVOLUTION_GLOBAL_INSTANCE)%'
 
     App\Service\WhatsApp\EvolutionApiManager:
         arguments:
