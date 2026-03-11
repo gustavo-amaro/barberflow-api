@@ -2,3 +2,8 @@
 api_login:
     path: /api/login
     methods: POST
+
+# API Refresh Token (tratado pelo firewall refresh_jwt)
+api_token_refresh:
+    path: /api/token/refresh
+    methods: POST

@@ -29,12 +29,17 @@ security:
         api:
             pattern: ^/api
             stateless: true
+            entry_point: jwt
             jwt: ~
+            refresh_jwt:
+                check_path: /api/token/refresh
+                provider: app_user_provider
 
     access_control:
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
+        - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS }
         - { path: ^/api/shops/public, roles: PUBLIC_ACCESS }
         - { path: ^/api/mercadopago/webhook, roles: PUBLIC_ACCESS }
         - { path: ^/api/asaas/webhook, roles: PUBLIC_ACCESS }
