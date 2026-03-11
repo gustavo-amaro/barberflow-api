@@ -127,6 +127,28 @@ class AppointmentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Agendamentos da barbearia com data >= hoje e não cancelados.
+     * Para filtrar por telefone do cliente, normalizar e comparar no controller.
+     * @return Appointment[]
+     */
+    public function findUpcomingByShop(Shop $shop): array
+    {
+        $today = new \DateTime('today');
+        return $this->createQueryBuilder('a')
+            ->join('a.barber', 'b')
+            ->andWhere('b.shop = :shop')
+            ->andWhere('a.date >= :today')
+            ->andWhere('a.status != :cancelled')
+            ->setParameter('shop', $shop)
+            ->setParameter('today', $today)
+            ->setParameter('cancelled', Appointment::STATUS_CANCELLED)
+            ->orderBy('a.date', 'ASC')
+            ->addOrderBy('a.time', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * @return Appointment[]
      */
     public function findPendingByShop(Shop $shop): array

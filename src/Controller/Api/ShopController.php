@@ -414,4 +414,70 @@ class ShopController extends AbstractController
             Response::HTTP_CREATED
         );
     }
+
+    /**
+     * Listar agendamentos do cliente por telefone (página pública, sem auth).
+     * Retorna apenas agendamentos futuros/hoje e não cancelados.
+     */
+    #[Route('/public/{slug}/appointments', name: 'api_shop_public_appointments_index', methods: ['GET'])]
+    public function listPublicAppointments(string $slug, Request $request): JsonResponse
+    {
+        $shop = $this->shopRepository->findBySlug($slug);
+        if (!$shop) {
+            return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $phone = $request->query->get('phone', '');
+        $phoneNormalized = preg_replace('/\D/', '', $phone);
+        if ($phoneNormalized === '') {
+            return $this->json(['appointments' => []]);
+        }
+
+        $all = $this->appointmentRepository->findUpcomingByShop($shop);
+        $filtered = array_filter($all, function (Appointment $a) use ($phoneNormalized) {
+            $aptPhone = $a->getPhone();
+            return $aptPhone && preg_replace('/\D/', '', (string) $aptPhone) === $phoneNormalized;
+        });
+
+        return $this->json([
+            'appointments' => $this->serializer->normalize(array_values($filtered), null, ['groups' => 'appointment:read']),
+        ]);
+    }
+
+    /**
+     * Cancelar agendamento pela página pública (sem auth).
+     * Corpo: { "phone": "..." }. O telefone deve coincidir com o do agendamento.
+     */
+    #[Route('/public/{slug}/appointments/{id}/cancel', name: 'api_shop_public_appointment_cancel', methods: ['POST'])]
+    public function cancelPublicAppointment(string $slug, int $id, Request $request): JsonResponse
+    {
+        $shop = $this->shopRepository->findBySlug($slug);
+        if (!$shop) {
+            return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $appointment = $this->appointmentRepository->find($id);
+        if (!$appointment || $appointment->getBarber()->getShop()->getId() !== $shop->getId()) {
+            return $this->json(['error' => 'Agendamento não encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($appointment->getStatus() === Appointment::STATUS_CANCELLED) {
+            return $this->json(['error' => 'Este agendamento já foi cancelado'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $phone = (string) ($data['phone'] ?? '');
+        $phoneNormalized = preg_replace('/\D/', '', $phone);
+        $aptPhone = $appointment->getPhone();
+        if (!$aptPhone || preg_replace('/\D/', '', (string) $aptPhone) !== $phoneNormalized) {
+            return $this->json(['error' => 'Telefone não confere com o agendamento'], Response::HTTP_FORBIDDEN);
+        }
+
+        $appointment->cancel();
+        $this->entityManager->flush();
+
+        return $this->json(
+            $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read'])
+        );
+    }
 }
