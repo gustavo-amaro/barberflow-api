@@ -4,7 +4,6 @@ namespace App\Controller\Api;
 
 use App\Entity\User;
 use App\Service\AsaasService;
-use App\Service\MercadoPagoService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,10 +13,8 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/api/payment')]
 class PaymentController extends AbstractController
 {
-    public function __construct(
-        private MercadoPagoService $mercadoPagoService,
-        private AsaasService $asaasService
-    ) {
+    public function __construct(private AsaasService $asaasService)
+    {
     }
 
     /**
@@ -42,11 +39,12 @@ class PaymentController extends AbstractController
         $plan = $data['plan'] ?? '';
 
         try {
-            $result = $this->mercadoPagoService->createPixCharge([
+            $result = $this->asaasService->createPixCharge([
                 'plan' => $plan,
                 'shopId' => $shop->getId(),
                 'userId' => $user->getId(),
                 'email' => $user->getEmail(),
+                'cpfCnpj' => $data['cpfCnpj'] ?? '',
             ]);
             return $this->json($result, Response::HTTP_CREATED);
         } catch (\InvalidArgumentException $e) {
@@ -71,7 +69,7 @@ class PaymentController extends AbstractController
             return $this->json(['error' => 'Não autenticado'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $status = $this->mercadoPagoService->getChargeStatus($id, $user->getId());
+        $status = $this->asaasService->getChargeStatus($id, $user->getId());
         if ($status === null) {
             return $this->json(['error' => 'Cobrança não encontrada'], Response::HTTP_NOT_FOUND);
         }

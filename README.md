@@ -144,26 +144,11 @@ php bin/console app:appointment-reminders
 
 Se as variáveis WhatsApp no `.env` estiverem vazias, as notificações ficam desativadas e o sistema segue funcionando normalmente.
 
-### Pagamento PIX (Mercado Pago)
+### Pagamento com ASAAS
 
-Para assinaturas (planos mensal, semestral, anual) via PIX:
+Para assinaturas (planos mensal, semestral, anual) via PIX **ou** cartão (recorrente):
 
-1. No `.env` da API, configure:
-
-```env
-MERCADOPAGO_BASE_URL=https://api.mercadopago.com/v1
-# Sandbox (testes): use o Access Token (token de acesso), NÃO a Chave pública.
-# Em https://www.mercadopago.com.br/developers/panel/app > Sua aplicação > Credenciais > Credenciais de teste
-MERCADOPAGO_SANDBOX_ACCESS_TOKEN=seu_access_token_test
-# Produção (quando for ao ar):
-# MERCADOPAGO_PROD_ACCESS_TOKEN=seu_access_token_prod
-```
-
-2. **Webhook:** a API envia automaticamente a URL de notificação ao criar cada PIX (`/api/mercadopago/webhook`), com base na URL da própria requisição. O Mercado Pago chama essa URL quando o pagamento for confirmado.
-
-O front faz polling em `GET /api/payment/pix/{id}/status` até o status `paid`; o webhook garante que a assinatura seja ativada mesmo se o usuário fechar a aba.
-
-**Cartão de crédito (assinatura recorrente via ASAAS):**
+**Configuração de credenciais:**
 
 1. No `.env` da API, configure:
 
@@ -176,7 +161,7 @@ ASSAS_SANDBOX_BASE_URL=https://sandbox.asaas.com/api
 # ASSAS_PROD_BASE_URL=https://api.asaas.com
 ```
 
-2. **Webhook:** configure no painel ASAAS a URL `https://seu-dominio/api/asaas/webhook` para o evento `PAYMENT_RECEIVED`, para que renovações automáticas atualizem a data de fim da assinatura na barbearia.
+2. **Webhook:** configure no painel ASAAS a URL `https://seu-dominio/api/asaas/webhook/payment` para o evento `PAYMENT_RECEIVED`, para que renovações automáticas e pagamentos PIX atualizem a data de fim da assinatura na barbearia.
 
 ## Endpoints da API
 
@@ -192,9 +177,8 @@ ASSAS_SANDBOX_BASE_URL=https://sandbox.asaas.com/api
 
 | Método | Endpoint | Descrição |
 |--------|----------|------------|
-| POST | `/api/payment/pix` | Gerar cobrança PIX (body: `{"plan": "mensal"\|"semestral"\|"anual"}`) |
+| POST | `/api/payment/pix` | Gerar cobrança PIX via ASAAS (body: `{"plan": "mensal"\|"semestral"\|"anual"}`) |
 | GET | `/api/payment/pix/{id}/status` | Status da cobrança (polling) |
-| POST | `/api/mercadopago/webhook` | Webhook do Mercado Pago (público) |
 
 ### Barbearia (Shop)
 

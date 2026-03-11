@@ -36,8 +36,7 @@ security:
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
         - { path: ^/api/shops/public, roles: PUBLIC_ACCESS }
-        - { path: ^/api/mercadopago/webhook, roles: PUBLIC_ACCESS }
-        - { path: ^/api/asaas/webhook, roles: PUBLIC_ACCESS }
+        - { path: ^/asaas/webhook, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 
 when@test:

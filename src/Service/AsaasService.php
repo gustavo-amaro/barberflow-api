@@ -25,6 +25,148 @@ class AsaasService
     }
 
     /**
+     * Cria cobrança PIX única para o plano selecionado.
+     * Retorna chargeId, encodedImage (QR base64) e payload (copia e cola),
+     * no mesmo formato que o front já usa hoje.
+     *
+     * @param array{plan: string, shopId: int, userId: int, email: string, cpfCnpj: string} $data
+     * @return array{chargeId: int, encodedImage: string, payload: string}
+     */
+    public function createPixCharge(array $data): array
+    {
+        $plan = $data['plan'] ?? '';
+        if (!isset(self::PLANS[$plan])) {
+            throw new \InvalidArgumentException('Plano inválido. Use: mensal, semestral ou anual.');
+        }
+
+        $shop = $this->em->getRepository(Shop::class)->find($data['shopId'] ?? 0);
+        if (!$shop || $shop->getOwner()?->getId() !== (int) ($data['userId'] ?? 0)) {
+            throw new \InvalidArgumentException('Barbearia não encontrada ou não pertence ao usuário.');
+        }
+
+        $email = $data['email'] ?? $shop->getOwner()?->getEmail() ?? '';
+        if ($email === '') {
+            throw new \InvalidArgumentException('E-mail é obrigatório.');
+        }
+
+        $cpfCnpj = preg_replace('/\D/', '', $data['cpfCnpj'] ?? '');
+        if ($cpfCnpj === '') {
+            throw new \InvalidArgumentException('Para criar esta cobrança é necessário preencher o CPF ou CNPJ do cliente.');
+        }
+
+        $planConfig = self::PLANS[$plan];
+        $amount = (float) $planConfig['amount'];
+
+        $charge = new SubscriptionCharge();
+        $charge->setUser($shop->getOwner());
+        $charge->setShop($shop);
+        $charge->setPlan($plan);
+        $charge->setAmount((string) $amount);
+        $charge->setGateway(SubscriptionCharge::GATEWAY_ASAAS);
+        $charge->setStatus(SubscriptionCharge::STATUS_PENDING);
+
+        $this->em->persist($charge);
+        $this->em->flush();
+
+        // Para PIX usamos sempre um cliente ASAAS vinculado ao CPF/CNPJ informado.
+        // Isso garante que mesmo se existir um asaasCustomerId antigo sem documento,
+        // vamos buscar/criar um cliente correto com CPF/CNPJ.
+        $clientData = $this->asaasClientService->findOrCreateClient([
+            'name'    => $shop->getOwner()?->getName() ?? $shop->getName() ?? 'Cliente',
+            'cpfCnpj' => $cpfCnpj,
+            'email'   => $email,
+        ]);
+        $customerId = $clientData['id'] ?? null;
+        if (!$customerId) {
+            throw new \RuntimeException('Resposta inválida ao criar/obter cliente no ASAAS');
+        }
+
+        $shop->setAsaasCustomerId($customerId);
+        $this->em->flush();
+
+        $baseURL = $this->asaasClientService->getBaseURL();
+
+        $paymentBody = [
+            'customer'          => $customerId,
+            'billingType'       => 'PIX',
+            'value'             => $amount,
+            'dueDate'           => (new \DateTimeImmutable())->format('Y-m-d'),
+            'description'       => $planConfig['description'],
+            'externalReference' => (string) $charge->getId(),
+        ];
+
+        $paymentResponse = $this->httpClient->request('POST', $baseURL . 'payments', [
+            'timeout' => 30,
+            'headers' => [
+                'accept'       => 'application/json',
+                'content-type' => 'application/json',
+                'access_token' => $this->asaasClientService->getAccessToken(),
+            ],
+            'body' => json_encode($paymentBody),
+        ]);
+
+        if (!in_array($paymentResponse->getStatusCode(), [Response::HTTP_OK, Response::HTTP_CREATED], true)) {
+            $err = $paymentResponse->toArray(false);
+            $charge->setStatus(SubscriptionCharge::STATUS_FAILED);
+            $this->em->flush();
+
+            $msg = $err['errors'][0]['description'] ?? 'Erro ao criar cobrança PIX no ASAAS';
+            throw new \RuntimeException($msg, $paymentResponse->getStatusCode());
+        }
+
+        $payment = $paymentResponse->toArray(false);
+        $paymentId = $payment['id'] ?? null;
+        if (!$paymentId) {
+            $charge->setStatus(SubscriptionCharge::STATUS_FAILED);
+            $this->em->flush();
+            throw new \RuntimeException('Resposta inválida ao criar cobrança PIX no ASAAS');
+        }
+
+        $charge->setGatewayPaymentId((string) $paymentId);
+        $this->em->flush();
+
+        // Busca QRCode PIX (imagem base64 + payload copia e cola)
+        $qrResponse = $this->httpClient->request('GET', $baseURL . 'payments/' . $paymentId . '/pixQrCode', [
+            'timeout' => 30,
+            'headers' => [
+                'accept'       => 'application/json',
+                'content-type' => 'application/json',
+                'access_token' => $this->asaasClientService->getAccessToken(),
+            ],
+        ]);
+
+        if ($qrResponse->getStatusCode() !== Response::HTTP_OK) {
+            $err = $qrResponse->toArray(false);
+            $msg = $err['errors'][0]['description'] ?? 'Erro ao gerar QR Code PIX no ASAAS';
+            throw new \RuntimeException($msg, $qrResponse->getStatusCode());
+        }
+
+        $qr = $qrResponse->toArray(false);
+
+        return [
+            'chargeId'     => $charge->getId(),
+            'encodedImage' => $qr['encodedImage'] ?? '',
+            'payload'      => $qr['payload'] ?? '',
+        ];
+    }
+
+    /**
+     * Consulta status da cobrança PIX (para polling no front).
+     */
+    public function getChargeStatus(int $chargeId, int $userId): ?array
+    {
+        $charge = $this->em->getRepository(SubscriptionCharge::class)->find($chargeId);
+        if (!$charge || $charge->getUser()?->getId() !== $userId) {
+            return null;
+        }
+
+        return [
+            'chargeId' => $charge->getId(),
+            'status'   => $charge->getStatus(),
+        ];
+    }
+
+    /**
      * Cria assinatura recorrente com cartão no ASAAS e ativa o plano na Shop.
      * Requer: plan, shop, user, dados do cartão e do titular, remoteIp.
      *
@@ -162,8 +304,9 @@ class AsaasService
     }
 
     /**
-     * Processa webhook PAYMENT_RECEIVED do ASAAS para renovação de assinatura.
-     * Estende subscriptionEndsAt da Shop quando o pagamento é de uma assinatura nossa.
+     * Processa webhook PAYMENT_RECEIVED do ASAAS.
+     * - Se houver subscription: renova assinatura recorrente (cartão).
+     * - Se não houver subscription mas houver externalReference numérico: finaliza cobrança PIX única.
      */
     public function handlePaymentReceivedWebhook(array $payload): bool
     {
@@ -173,36 +316,63 @@ class AsaasService
 
         $payment = $payload['payment'] ?? [];
         $subscriptionId = $payment['subscription'] ?? null;
-        if ($subscriptionId === null || $subscriptionId === '') {
+
+        if ($subscriptionId !== null && $subscriptionId !== '') {
+            $shop = $this->em->getRepository(Shop::class)->findOneBy(['asaasSubscriptionId' => $subscriptionId]);
+            if (!$shop) {
+                return false;
+            }
+
+            $plan = $shop->getSubscriptionPlan();
+            if ($plan === null || $plan === '') {
+                return false;
+            }
+
+            $endsAt = $this->computeSubscriptionEndsAt($plan, $shop->getSubscriptionEndsAt());
+            $shop->setSubscriptionEndsAt($endsAt);
+            $this->em->flush();
+
+            $amount = $payment['value'] ?? 0;
+            $charge = new SubscriptionCharge();
+            $charge->setUser($shop->getOwner());
+            $charge->setShop($shop);
+            $charge->setPlan($plan);
+            $charge->setAmount((string) $amount);
+            $charge->setGateway(SubscriptionCharge::GATEWAY_ASAAS);
+            $charge->setStatus(SubscriptionCharge::STATUS_PAID);
+            $charge->setGatewayPaymentId((string) ($payment['id'] ?? ''));
+            $charge->setPaidAt(new \DateTimeImmutable());
+            $charge->setPaymentData($payment);
+            $this->em->persist($charge);
+            $this->em->flush();
+
+            return true;
+        }
+
+        $externalRef = $payment['externalReference'] ?? null;
+        if ($externalRef === null || $externalRef === '') {
             return false;
         }
 
-        $shop = $this->em->getRepository(Shop::class)->findOneBy(['asaasSubscriptionId' => $subscriptionId]);
-        if (!$shop) {
+        $charge = $this->em->getRepository(SubscriptionCharge::class)->find((int) $externalRef);
+        if (!$charge || $charge->getStatus() !== SubscriptionCharge::STATUS_PENDING) {
             return false;
         }
 
-        $plan = $shop->getSubscriptionPlan();
-        if ($plan === null || $plan === '') {
+        $shop = $charge->getShop();
+        $plan = $charge->getPlan();
+        if ($shop === null || $plan === null || $plan === '') {
             return false;
         }
 
-        $endsAt = $this->computeSubscriptionEndsAt($plan, $shop->getSubscriptionEndsAt());
-        $shop->setSubscriptionEndsAt($endsAt);
-        $this->em->flush();
-
-        $amount = $payment['value'] ?? 0;
-        $charge = new SubscriptionCharge();
-        $charge->setUser($shop->getOwner());
-        $charge->setShop($shop);
-        $charge->setPlan($plan);
-        $charge->setAmount((string) $amount);
-        $charge->setGateway(SubscriptionCharge::GATEWAY_ASAAS);
         $charge->setStatus(SubscriptionCharge::STATUS_PAID);
-        $charge->setGatewayPaymentId((string) ($payment['id'] ?? ''));
         $charge->setPaidAt(new \DateTimeImmutable());
         $charge->setPaymentData($payment);
-        $this->em->persist($charge);
+
+        $endsAt = $this->computeSubscriptionEndsAt($plan, $shop->getSubscriptionEndsAt());
+        $shop->setSubscriptionPlan($plan);
+        $shop->setSubscriptionEndsAt($endsAt);
+
         $this->em->flush();
 
         return true;

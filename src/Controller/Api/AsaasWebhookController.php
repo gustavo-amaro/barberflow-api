@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[Route('/api/asaas')]
+#[Route('/asaas')]
 class AsaasWebhookController extends AbstractController
 {
     public function __construct(

@@ -15,7 +15,6 @@ class SubscriptionCharge
     public const STATUS_FAILED = 'failed';
     public const STATUS_EXPIRED = 'expired';
 
-    public const GATEWAY_MERCADOPAGO = 'mercadopago';
     public const GATEWAY_ASAAS = 'asaas';
 
     #[ORM\Id]
