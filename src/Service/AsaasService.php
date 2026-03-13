@@ -12,7 +12,7 @@ class AsaasService
 {
     /** Parcela única por ciclo: mensal 1x/mês, semestral 1x/6 meses, anual 1x/12 meses */
     private const PLANS = [
-        'mensal'     => ['amount' => 40.00, 'description' => 'Link do Barbeiro - Plano Mensal', 'cycle' => 'MONTHLY'],
+        'mensal'     => ['amount' => 39.90, 'description' => 'Link do Barbeiro - Plano Mensal', 'cycle' => 'MONTHLY'],
         'semestral'  => ['amount' => 204.00, 'description' => 'Link do Barbeiro - Plano Semestral', 'cycle' => 'SEMIANNUALLY'],
         'anual'      => ['amount' => 336.00, 'description' => 'Link do Barbeiro - Plano Anual', 'cycle' => 'YEARLY'],
     ];

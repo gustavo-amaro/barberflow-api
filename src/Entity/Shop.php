@@ -408,16 +408,32 @@ class Shop
         return $this;
     }
 
-    /** Assinatura está ativa: sem data de fim (trial) ou data de fim >= hoje. */
+    /** Assinatura está ativa:
+     * - Se houver subscriptionEndsAt: data de fim >= hoje
+     * - Se for plano gratuito (trial ou sem plano): createdAt + 15 dias >= hoje
+     */
     public function isSubscriptionActive(): bool
     {
-        $endsAt = $this->subscriptionEndsAt;
-        if ($endsAt === null) {
-            return true; // trial ou nunca assinou (acesso liberado)
-        }
         $today = new \DateTimeImmutable('today');
 
-        return $endsAt >= $today;
+        // Se existe uma data de fim configurada (planos pagos), usa ela como referência
+        if ($this->subscriptionEndsAt !== null) {
+            return $this->subscriptionEndsAt >= $today;
+        }
+
+        // Plano gratuito (trial): 15 dias a partir da criação da barbearia
+        if ($this->subscriptionPlan === null || $this->subscriptionPlan === 'trial') {
+            if ($this->createdAt === null) {
+                // fallback defensivo: se por algum motivo não tiver createdAt, considera ativo
+                return true;
+            }
+
+            $trialEnd = $this->createdAt->modify('+15 days');
+            return $trialEnd >= $today;
+        }
+
+        // Qualquer outro caso sem subscriptionEndsAt é considerado ativo por segurança
+        return true;
     }
 
     public function getCreatedAt(): ?\DateTimeImmutable
