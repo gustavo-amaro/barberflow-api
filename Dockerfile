@@ -99,9 +99,9 @@ WORKDIR /var/www
 # Copia a aplicação do builder (com vendor)
 COPY --from=builder --chown=app:app /app /var/www
 
-# Diretórios que precisam de escrita (cache, logs, JWT)
-RUN mkdir -p var/cache var/log config/jwt \
-    && chown -R app:app var config/jwt
+# Diretórios que precisam de escrita (cache, logs, JWT, uploads)
+RUN mkdir -p var/cache var/log config/jwt public/uploads \
+    && chown -R app:app var config/jwt public/uploads
 
 EXPOSE 80
 

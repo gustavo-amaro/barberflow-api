@@ -33,6 +33,8 @@ services:
       - ./.env:/var/www/.env:ro
       # Chaves JWT (geradas na VPS; somente leitura)
       - ./config/jwt:/var/www/config/jwt:ro
+      # Uploads de imagens (logo, avatar, etc.) – persiste entre builds
+      - barberflow_uploads:/var/www/public/uploads
     networks:
       - barberflow_network
     depends_on:
@@ -110,6 +112,8 @@ networks:
 
 volumes:
   barberflow_db_data:
+    driver: local
+  barberflow_uploads:
     driver: local
   evolution_redis_data:
     driver: local

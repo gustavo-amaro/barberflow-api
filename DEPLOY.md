@@ -116,6 +116,12 @@ docker compose -f docker-compose.prod.yml run --rm --entrypoint "" api \
   - `DATABASE_URL=mysql://user:pass@host:3306/barberflow?serverVersion=8.0&charset=utf8mb4`
   - e remova ou comente o serviço `database` e o `depends_on` do serviço `api`.
 
+## Uploads de imagens
+
+- As imagens (logo da barbearia, avatar, fotos de serviços/produtos) são salvas em **`public/uploads`** na API.
+- O `docker-compose.prod.yml` monta o volume **`barberflow_uploads`** em `/var/www/public/uploads`, para que os arquivos **persistam entre rebuilds** e não sumam ao gerar nova build.
+- Se você subir a API sem esse volume, a pasta é criada automaticamente no primeiro upload, mas os arquivos serão perdidos ao recriar o container.
+
 ## Evolution API (WhatsApp)
 
 O `docker-compose.prod.yml` já inclui a Evolution API e o Redis:
