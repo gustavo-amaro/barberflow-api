@@ -36,6 +36,8 @@ class AppointmentSlotService
     {
         $barberStart = $this->getStartTime($barber);
         $barberEnd = $this->getEndTime($barber);
+        $lunchStart = $this->getLunchStart($barber);
+        $lunchEnd = $this->getLunchEnd($barber);
 
         $shop = $barber->getShop();
         $dayOfWeek = (int) $date->format('w'); // 0=domingo a 6=sábado
@@ -67,6 +69,25 @@ class AppointmentSlotService
         $result = [];
         foreach ($slots as $time) {
             $available = true;
+
+            if ($available && $lunchStart !== null && $lunchEnd !== null) {
+                $slotStartMinutes = $this->timeToMinutes($time);
+                $slotEndMinutes = $slotStartMinutes + ($durationMinutes ?? self::SLOT_INTERVAL);
+                $lunchStartMinutes = $this->timeToMinutes($lunchStart);
+                $lunchEndMinutes = $this->timeToMinutes($lunchEnd);
+
+                if ($lunchEndMinutes > $lunchStartMinutes) {
+                    if ($durationMinutes !== null) {
+                        if ($slotStartMinutes < $lunchEndMinutes && $lunchStartMinutes < $slotEndMinutes) {
+                            $available = false;
+                        }
+                    } else {
+                        if ($slotStartMinutes >= $lunchStartMinutes && $slotStartMinutes < $lunchEndMinutes) {
+                            $available = false;
+                        }
+                    }
+                }
+            }
 
             if ($durationMinutes !== null) {
                 // Serviço precisa caber a partir deste slot: todos os blocos de 15 min até slot+duration devem estar livres
@@ -152,6 +173,24 @@ class AppointmentSlotService
             return $workEnd->format('H:i');
         }
         return self::DEFAULT_END;
+    }
+
+    private function getLunchStart(Barber $barber): ?string
+    {
+        $lunchStart = $barber->getLunchStart();
+        if ($lunchStart instanceof \DateTimeInterface) {
+            return $lunchStart->format('H:i');
+        }
+        return null;
+    }
+
+    private function getLunchEnd(Barber $barber): ?string
+    {
+        $lunchEnd = $barber->getLunchEnd();
+        if ($lunchEnd instanceof \DateTimeInterface) {
+            return $lunchEnd->format('H:i');
+        }
+        return null;
     }
 
     /**

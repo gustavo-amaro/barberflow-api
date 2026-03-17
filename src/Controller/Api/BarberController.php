@@ -78,6 +78,18 @@ class BarberController extends AbstractController
         if (isset($data['workEnd'])) {
             $barber->setWorkEnd(new \DateTime($data['workEnd']));
         }
+        if (array_key_exists('lunchStart', $data)) {
+            $barber->setLunchStart($data['lunchStart'] !== null && $data['lunchStart'] !== ''
+                ? new \DateTime($data['lunchStart'])
+                : null
+            );
+        }
+        if (array_key_exists('lunchEnd', $data)) {
+            $barber->setLunchEnd($data['lunchEnd'] !== null && $data['lunchEnd'] !== ''
+                ? new \DateTime($data['lunchEnd'])
+                : null
+            );
+        }
 
         // Validate
         $errors = $this->validator->validate($barber);
@@ -178,6 +190,18 @@ class BarberController extends AbstractController
         }
         if (isset($data['workEnd'])) {
             $barber->setWorkEnd(new \DateTime($data['workEnd']));
+        }
+        if (array_key_exists('lunchStart', $data)) {
+            $barber->setLunchStart($data['lunchStart'] !== null && $data['lunchStart'] !== ''
+                ? new \DateTime($data['lunchStart'])
+                : null
+            );
+        }
+        if (array_key_exists('lunchEnd', $data)) {
+            $barber->setLunchEnd($data['lunchEnd'] !== null && $data['lunchEnd'] !== ''
+                ? new \DateTime($data['lunchEnd'])
+                : null
+            );
         }
 
         // Validate

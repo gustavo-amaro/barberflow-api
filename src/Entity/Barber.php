@@ -71,6 +71,14 @@ class Barber
     #[Groups(['barber:read', 'barber:write'])]
     private ?\DateTimeInterface $workEnd = null;
 
+    #[ORM\Column(type: Types::TIME_MUTABLE, nullable: true)]
+    #[Groups(['barber:read', 'barber:write'])]
+    private ?\DateTimeInterface $lunchStart = null;
+
+    #[ORM\Column(type: Types::TIME_MUTABLE, nullable: true)]
+    #[Groups(['barber:read', 'barber:write'])]
+    private ?\DateTimeInterface $lunchEnd = null;
+
     #[ORM\Column]
     #[Groups(['barber:read', 'barber:write'])]
     private ?bool $active = true;
@@ -233,6 +241,28 @@ class Barber
     public function setWorkEnd(?\DateTimeInterface $workEnd): static
     {
         $this->workEnd = $workEnd;
+        return $this;
+    }
+
+    public function getLunchStart(): ?\DateTimeInterface
+    {
+        return $this->lunchStart;
+    }
+
+    public function setLunchStart(?\DateTimeInterface $lunchStart): static
+    {
+        $this->lunchStart = $lunchStart;
+        return $this;
+    }
+
+    public function getLunchEnd(): ?\DateTimeInterface
+    {
+        return $this->lunchEnd;
+    }
+
+    public function setLunchEnd(?\DateTimeInterface $lunchEnd): static
+    {
+        $this->lunchEnd = $lunchEnd;
         return $this;
     }
 
