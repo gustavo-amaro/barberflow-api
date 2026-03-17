@@ -236,7 +236,14 @@ class AppointmentController extends AbstractController
         $appointment->setPhone($data['phone'] ?? ($client ? $client->getPhone() : null));
         $appointment->setDate(new \DateTime($data['date'] ?? 'today'));
         $appointment->setTime(new \DateTime($data['time'] ?? 'now'));
-        $appointment->setStatus($data['status'] ?? Appointment::STATUS_PENDING);
+        $initialStatus = $data['status'] ?? null;
+        $wasAutoConfirmed = false;
+        if ($initialStatus !== null) {
+            $appointment->setStatus($initialStatus);
+        } else {
+            $wasAutoConfirmed = $shop->isAutoConfirmAppointments();
+            $appointment->setStatus($wasAutoConfirmed ? Appointment::STATUS_CONFIRMED : Appointment::STATUS_PENDING);
+        }
         $appointment->setPrice($data['price'] ?? $service->getPrice());
 
         // Validate
@@ -252,7 +259,12 @@ class AppointmentController extends AbstractController
         $this->entityManager->persist($appointment);
         $this->entityManager->flush();
 
-        $this->appointmentNotification->notifyShopNewAppointment($appointment);
+        if ($wasAutoConfirmed) {
+            $this->appointmentNotification->notifyShopNewAppointment($appointment, true);
+            $this->appointmentNotification->notifyClientAppointmentConfirmed($appointment);
+        } else {
+            $this->appointmentNotification->notifyShopNewAppointment($appointment);
+        }
 
         return $this->json(
             $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read']),

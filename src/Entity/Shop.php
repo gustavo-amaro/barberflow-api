@@ -44,6 +44,11 @@ class Shop
     #[Groups(['shop:read', 'shop:write'])]
     private ?string $instagram = null;
 
+    /** Se true, todo agendamento novo é criado já como confirmado. */
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['shop:read', 'shop:write'])]
+    private bool $autoConfirmAppointments = false;
+
     /** Nome da instância na Evolution API (uma por barbearia). */
     #[ORM\Column(length: 80, nullable: true)]
     #[Groups(['shop:read', 'shop:write'])]
@@ -193,6 +198,17 @@ class Shop
     public function setInstagram(?string $instagram): static
     {
         $this->instagram = $instagram;
+        return $this;
+    }
+
+    public function isAutoConfirmAppointments(): bool
+    {
+        return $this->autoConfirmAppointments;
+    }
+
+    public function setAutoConfirmAppointments(bool $autoConfirmAppointments): static
+    {
+        $this->autoConfirmAppointments = $autoConfirmAppointments;
         return $this;
     }
 

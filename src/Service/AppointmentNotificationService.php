@@ -15,8 +15,9 @@ class AppointmentNotificationService
 
     /**
      * Notifica a barbearia quando um novo agendamento é criado (público ou painel).
+     * Se $autoConfirmed for true, a mensagem indica "Status: confirmado automaticamente."
      */
-    public function notifyShopNewAppointment(Appointment $appointment): void
+    public function notifyShopNewAppointment(Appointment $appointment, bool $autoConfirmed = false): void
     {
         $shop = $appointment->getBarber()->getShop();
         $phone = $shop->getPhone();
@@ -35,7 +36,7 @@ class AppointmentNotificationService
         $message .= "Data: {$date} às {$time}\n";
         $message .= "Serviço: {$serviceName}\n";
         $message .= "Barbeiro: {$barberName}\n";
-        $message .= "Status: pendente de confirmação.";
+        $message .= $autoConfirmed ? "Status: confirmado automaticamente." : "Status: pendente de confirmação.";
 
         $this->sendSafe($shop, $phone, $message, 'notifyShopNewAppointment', true);
     }

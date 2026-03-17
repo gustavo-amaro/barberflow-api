@@ -228,6 +228,9 @@ class ShopController extends AbstractController
         if (array_key_exists('instagram', $data)) {
             $shop->setInstagram($data['instagram']);
         }
+        if (array_key_exists('autoConfirmAppointments', $data)) {
+            $shop->setAutoConfirmAppointments((bool) $data['autoConfirmAppointments']);
+        }
 
         // Validate
         $errors = $this->validator->validate($shop);
@@ -402,7 +405,14 @@ class ShopController extends AbstractController
         $appointment->setPhone($data['phone'] ?? ($client ? $client->getPhone() : null));
         $appointment->setDate($aptDate);
         $appointment->setTime($aptTime);
-        $appointment->setStatus($data['status'] ?? Appointment::STATUS_PENDING);
+        $initialStatus = $data['status'] ?? null;
+        $wasAutoConfirmed = false;
+        if ($initialStatus !== null) {
+            $appointment->setStatus($initialStatus);
+        } else {
+            $wasAutoConfirmed = $shop->isAutoConfirmAppointments();
+            $appointment->setStatus($wasAutoConfirmed ? Appointment::STATUS_CONFIRMED : Appointment::STATUS_PENDING);
+        }
         $appointment->setPrice($data['price'] ?? $service->getPrice());
 
         $errors = $this->validator->validate($appointment);
@@ -417,7 +427,12 @@ class ShopController extends AbstractController
         $this->entityManager->persist($appointment);
         $this->entityManager->flush();
 
-        $this->appointmentNotification->notifyShopNewAppointment($appointment);
+        if ($wasAutoConfirmed) {
+            $this->appointmentNotification->notifyShopNewAppointment($appointment, true);
+            $this->appointmentNotification->notifyClientAppointmentConfirmed($appointment);
+        } else {
+            $this->appointmentNotification->notifyShopNewAppointment($appointment);
+        }
 
         return $this->json(
             $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read']),
