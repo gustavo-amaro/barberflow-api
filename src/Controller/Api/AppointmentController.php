@@ -132,6 +132,7 @@ class AppointmentController extends AbstractController
 
         $barberId = (int) ($request->query->get('barber_id') ?? 0);
         $dateStr = $request->query->get('date');
+        $serviceId = $request->query->get('service_id') ? (int) $request->query->get('service_id') : null;
         if (!$barberId || !$dateStr) {
             return $this->json(['error' => 'barber_id e date são obrigatórios'], Response::HTTP_BAD_REQUEST);
         }
@@ -147,7 +148,15 @@ class AppointmentController extends AbstractController
             return $this->json(['error' => 'Data inválida'], Response::HTTP_BAD_REQUEST);
         }
 
-        $slots = $this->slotService->getSlotsForBarberAndDate($barber, $date);
+        $durationMinutes = null;
+        if ($serviceId) {
+            $service = $this->serviceRepository->find($serviceId);
+            if ($service && $service->getShop()->getId() === $shop->getId()) {
+                $durationMinutes = $service->getDuration();
+            }
+        }
+
+        $slots = $this->slotService->getSlotsForBarberAndDate($barber, $date, $durationMinutes);
         return $this->json(['slots' => $slots]);
     }
 
@@ -188,8 +197,9 @@ class AppointmentController extends AbstractController
                 Response::HTTP_BAD_REQUEST
             );
         }
-        $existing = $this->appointmentRepository->findOneByBarberAndDateTime($barber, $aptDate, $aptTime);
-        if ($existing) {
+        $serviceDuration = $service->getDuration() ?? 30;
+
+        if ($this->slotService->hasOverlap($barber, $aptDate, $aptTime, $serviceDuration)) {
             return $this->json(
                 ['error' => 'Este barbeiro já possui um agendamento neste horário. Escolha outro horário ou outro profissional.'],
                 Response::HTTP_CONFLICT
