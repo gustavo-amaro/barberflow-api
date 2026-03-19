@@ -62,7 +62,9 @@ class AppointmentSlotService
 
         $slots = $this->generateTimeSlots($start, $end);
 
-        $occupied = $this->getOccupiedSlotsByDuration($barber, $date);
+        // Grade de slots segue $start (ex.: 8:20, 8:35…). Ocupação precisa usar a mesma grade;
+        // intdiv(minutos, 15)*15 alinha só a :00/:15/:30/:45 e quebra quando a abertura não é múltiplo de 15.
+        $occupied = $this->getOccupiedSlotsByDuration($barber, $date, $start, $end);
         $now = new \DateTime('now');
         $isToday = $date->format('Y-m-d') === $now->format('Y-m-d');
 
@@ -214,11 +216,13 @@ class AppointmentSlotService
 
     /**
      * Slots de 15 min já ocupados pelo barbeiro na data (cada agendamento bloqueia início até início+duração do serviço).
+     * $gridStart/$gridEnd devem ser os mesmos usados em generateTimeSlots para o dia.
      *
-     * @return string[] Lista de "H:i" (cada slot de 15 min que cai dentro de algum agendamento)
+     * @return string[] Lista de "H:i" (cada slot da grade que intersecciona algum agendamento)
      */
-    private function getOccupiedSlotsByDuration(Barber $barber, \DateTimeInterface $date): array
+    private function getOccupiedSlotsByDuration(Barber $barber, \DateTimeInterface $date, string $gridStart, string $gridEnd): array
     {
+        $slotTimes = $this->generateTimeSlots($gridStart, $gridEnd);
         $appointments = $this->appointmentRepository->findByBarberAndDate($barber, $date);
         $occupied = [];
         foreach ($appointments as $apt) {
@@ -226,17 +230,19 @@ class AppointmentSlotService
             if (!$t instanceof \DateTimeInterface) {
                 continue;
             }
-            $startMinutes = (int) $t->format('H') * 60 + (int) $t->format('i');
+            $aptStart = (int) $t->format('H') * 60 + (int) $t->format('i');
             $duration = 30;
             if ($apt->getService() !== null) {
                 $duration = $apt->getService()->getDuration() ?? 30;
             }
-            $endMinutes = $startMinutes + $duration;
+            $aptEnd = $aptStart + $duration;
 
-            // Marca qualquer slot de 15 min que intersecciona o intervalo [start, end)
-            $firstSlot = intdiv($startMinutes, self::SLOT_INTERVAL) * self::SLOT_INTERVAL;
-            for ($m = $firstSlot; $m < $endMinutes; $m += self::SLOT_INTERVAL) {
-                $occupied[$this->minutesToTime($m)] = true;
+            foreach ($slotTimes as $slot) {
+                $slotStart = $this->timeToMinutes($slot);
+                $slotEnd = $slotStart + self::SLOT_INTERVAL;
+                if ($slotStart < $aptEnd && $aptStart < $slotEnd) {
+                    $occupied[$slot] = true;
+                }
             }
         }
         return array_keys($occupied);
@@ -249,17 +255,6 @@ class AppointmentSlotService
             return 0;
         }
         return (int) $dt->format('H') * 60 + (int) $dt->format('i');
-    }
-
-    private function minutesToTime(int $minutes): string
-    {
-        $minutes = $minutes % (24 * 60);
-        if ($minutes < 0) {
-            $minutes += 24 * 60;
-        }
-        $h = intdiv($minutes, 60);
-        $m = $minutes % 60;
-        return sprintf('%02d:%02d', $h, $m);
     }
 
     private function addMinutesToTime(string $time, int $minutes): string
