@@ -40,6 +40,10 @@ class AppointmentSlotService
         $lunchEnd = $this->getLunchEnd($barber);
 
         $shop = $barber->getShop();
+        if ($shop !== null && $shop->isClosedOnDate($date)) {
+            return [];
+        }
+
         $dayOfWeek = (int) $date->format('w'); // 0=domingo a 6=sábado
         $shopSchedule = $shop ? $this->shopScheduleRepository->findOneByShopAndDay($shop, $dayOfWeek) : null;
 

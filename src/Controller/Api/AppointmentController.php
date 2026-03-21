@@ -191,6 +191,12 @@ class AppointmentController extends AbstractController
 
         $aptDate = new \DateTime($data['date'] ?? 'today');
         $aptTime = new \DateTime($data['time'] ?? 'now');
+        if ($shop->isClosedOnDate($aptDate)) {
+            return $this->json(
+                ['error' => 'Não há atendimento nesta data (feriado ou dia fechado). Escolha outra data.'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
         if ($this->slotService->isPast($aptDate, $aptTime)) {
             return $this->json(
                 ['error' => 'Não é possível agendar horário no passado. Escolha uma data e horário futuros.'],
@@ -350,6 +356,13 @@ class AppointmentController extends AbstractController
         }
         if (isset($data['price'])) {
             $appointment->setPrice($data['price']);
+        }
+
+        if (isset($data['date']) && $shop->isClosedOnDate($appointment->getDate())) {
+            return $this->json(
+                ['error' => 'Não há atendimento nesta data (feriado ou dia fechado). Escolha outra data.'],
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         $existing = $this->appointmentRepository->findOneByBarberAndDateTime(

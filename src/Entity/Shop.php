@@ -49,6 +49,15 @@ class Shop
     #[Groups(['shop:read', 'shop:write'])]
     private bool $autoConfirmAppointments = false;
 
+    /**
+     * Datas em que a barbearia não atende (feriados/folgas), formato Y-m-d.
+     *
+     * @var list<string>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['shop:read'])]
+    private ?array $closedDates = null;
+
     /** Nome da instância na Evolution API (uma por barbearia). */
     #[ORM\Column(length: 80, nullable: true)]
     #[Groups(['shop:read', 'shop:write'])]
@@ -210,6 +219,35 @@ class Shop
     {
         $this->autoConfirmAppointments = $autoConfirmAppointments;
         return $this;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getClosedDates(): array
+    {
+        if ($this->closedDates === null) {
+            return [];
+        }
+
+        return $this->closedDates;
+    }
+
+    /**
+     * @param list<string> $closedDates
+     */
+    public function setClosedDates(array $closedDates): static
+    {
+        $this->closedDates = $closedDates;
+
+        return $this;
+    }
+
+    public function isClosedOnDate(\DateTimeInterface $date): bool
+    {
+        $key = $date->format('Y-m-d');
+
+        return \in_array($key, $this->getClosedDates(), true);
     }
 
     public function getEvolutionInstanceName(): ?string

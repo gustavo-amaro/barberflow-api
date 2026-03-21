@@ -175,6 +175,37 @@ class ShopController extends AbstractController
         return $this->scheduleShow();
     }
 
+    #[Route('/closed-dates', name: 'api_shop_closed_dates_update', methods: ['PUT', 'PATCH'])]
+    public function closedDatesUpdate(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        $shop = $user->getShop();
+        if (!$shop) {
+            return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!$data) {
+            return $this->json(['error' => 'Dados inválidos'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $normalized = $this->normalizeClosedDatesInput($data['closedDates'] ?? []);
+        if ($normalized === null) {
+            return $this->json(
+                ['error' => 'Lista closedDates inválida. Use datas no formato AAAA-MM-DD (máx. 400 datas).'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        $shop->setClosedDates($normalized);
+        $this->entityManager->flush();
+
+        return $this->json([
+            'closedDates' => $shop->getClosedDates(),
+        ]);
+    }
+
     #[Route('', name: 'api_shop_show', methods: ['GET'])]
     public function show(): JsonResponse
     {
@@ -291,6 +322,7 @@ class ShopController extends AbstractController
                 'logo' => $shop->getLogo(),
                 'phone' => $shop->getPhone(),
                 'instagram' => $shop->getInstagram(),
+                'closedDates' => $shop->getClosedDates(),
             ],
             'services' => $this->serializer->normalize($services, null, ['groups' => 'service:read']),
             'barbers' => $this->serializer->normalize($barbers, null, ['groups' => 'barber:read']),
@@ -368,6 +400,12 @@ class ShopController extends AbstractController
 
         $aptDate = new \DateTime($data['date'] ?? 'today');
         $aptTime = new \DateTime($data['time'] ?? 'now');
+        if ($shop->isClosedOnDate($aptDate)) {
+            return $this->json(
+                ['error' => 'Não há atendimento nesta data (feriado ou dia fechado). Escolha outra data.'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
         if ($this->slotService->isPast($aptDate, $aptTime)) {
             return $this->json(
                 ['error' => 'Não é possível agendar horário no passado. Escolha uma data e horário futuros.'],
@@ -505,5 +543,40 @@ class ShopController extends AbstractController
         return $this->json(
             $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read'])
         );
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function normalizeClosedDatesInput(mixed $raw): ?array
+    {
+        if (!\is_array($raw)) {
+            return null;
+        }
+        if (\count($raw) > 400) {
+            return null;
+        }
+        $seen = [];
+        foreach ($raw as $item) {
+            if (!\is_string($item)) {
+                return null;
+            }
+            $item = trim($item);
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $item)) {
+                return null;
+            }
+            $parts = explode('-', $item);
+            $y = (int) $parts[0];
+            $m = (int) $parts[1];
+            $d = (int) $parts[2];
+            if (!checkdate($m, $d, $y)) {
+                return null;
+            }
+            $seen[$item] = true;
+        }
+        $out = array_keys($seen);
+        sort($out);
+
+        return $out;
     }
 }
