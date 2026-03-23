@@ -63,3 +63,5 @@ npm-debug.log*
 /phpunit.xml
 /.phpunit.cache/
 ###< phpunit/phpunit ###
+
+/docker/volumes/

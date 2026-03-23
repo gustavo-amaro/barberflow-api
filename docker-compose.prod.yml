@@ -37,7 +37,7 @@ services:
       # Chaves JWT (geradas na VPS; somente leitura)
       - ./config/jwt:/var/www/config/jwt:ro
       # Uploads de imagens (logo, avatar, etc.) – persiste entre builds
-      - barberflow_uploads:/var/www/public/uploads
+      - ./docker/volumes/barberflow_uploads:/var/www/public/uploads
     networks:
       - barberflow_network
     depends_on:
@@ -54,7 +54,7 @@ services:
       MYSQL_USER: ${DB_USER:-barberflow}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - barberflow_db_data:/var/lib/mysql
+      - ./docker/volumes/barberflow_db_data:/var/lib/mysql
       - ./docker/mysql/init-evolution.sql:/docker-entrypoint-initdb.d/02-evolution.sql:ro
     networks:
       - barberflow_network
@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
-      - evolution_redis_data:/data
+      - ./docker/volumes/evolution_redis_data:/data
     networks:
       - barberflow_network
 
@@ -93,7 +93,7 @@ services:
     ports:
       - "8084:8080"
     volumes:
-      - evolution_instances:/evolution/instances
+      - ./docker/volumes/evolution_instances:/evolution/instances
     networks:
       - barberflow_network
     depends_on:
