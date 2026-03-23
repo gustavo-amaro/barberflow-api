@@ -43,7 +43,6 @@ services:
     depends_on:
       database:
         condition: service_healthy
-    mem_limit: 320m
 
   database:
     image: mysql:8.0
@@ -73,12 +72,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: >-
-      --default-authentication-plugin=mysql_native_password
-      --innodb-buffer-pool-size=64M
-      --performance-schema=OFF
-      --table-open-cache=256
-    mem_limit: 384m
+    command: --default-authentication-plugin=mysql_native_password
 
   # Redis (cache da Evolution API)
   evolution_redis:
@@ -90,7 +84,6 @@ services:
       - evolution_redis_data:/data
     networks:
       - barberflow_network
-    mem_limit: 64m
 
   # Evolution API (WhatsApp) - porta 8084
   evolution_api:
@@ -115,7 +108,6 @@ services:
       CACHE_REDIS_URI: redis://evolution_redis:6379
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-evolution_secret_key}
       LOG_LEVEL: ERROR,WARN,INFO
-    mem_limit: 384m
 
 networks:
   barberflow_network:
