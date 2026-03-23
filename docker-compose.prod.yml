@@ -36,7 +36,7 @@ services:
       # Chaves JWT (geradas na VPS; somente leitura)
       - ./config/jwt:/var/www/config/jwt:ro
       # Uploads de imagens (logo, avatar, etc.) – persiste entre builds
-      - ./docker/volumes/barberflow_uploads:/var/www/public/uploads
+      - barberflow_uploads:/var/www/public/uploads
     networks:
       - barberflow_network
     depends_on:
@@ -53,7 +53,7 @@ services:
       MYSQL_USER: ${DB_USER:-barberflow}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - ./docker/volumes/barberflow_db_data:/var/lib/mysql
+      - barberflow_db_data:/var/lib/mysql
     networks:
       - barberflow_network
     healthcheck:
