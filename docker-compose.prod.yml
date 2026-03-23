@@ -1,5 +1,7 @@
 # Barberflow API - Deploy em VPS (~1 GB RAM)
-# Serviços: API (porta 80), MySQL, Evolution API (porta 8084), Redis
+# Serviços: API, MySQL (apenas Barberflow).
+# Evolution API fica em outro servidor: use docker-compose.evolution.yml e aponte
+# WHATSAPP_EVOLUTION_BASE_URL para a URL pública dessa instância (mesmo EVOLUTION_API_KEY no .env da API).
 #
 # mem_limit: evita um único container consumir toda a RAM do host (swap/travamentos).
 # Ajuste se tiver mais RAM ou se algum serviço reiniciar por OOM.
@@ -30,7 +32,7 @@ services:
       JWT_PASSPHRASE: ${JWT_PASSPHRASE}
       JWT_TOKEN_TTL: ${JWT_TOKEN_TTL:-3600}
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-'^https?://.*$'}
-      WHATSAPP_EVOLUTION_BASE_URL: ${WHATSAPP_EVOLUTION_BASE_URL:-http://evolution_api:8080}
+      WHATSAPP_EVOLUTION_BASE_URL: ${WHATSAPP_EVOLUTION_BASE_URL}
     volumes:
       # .env do host (Symfony/console precisa ler)
       - ./.env:/var/www/.env:ro
@@ -55,7 +57,6 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./docker/volumes/barberflow_db_data:/var/lib/mysql
-      - ./docker/mysql/init-evolution.sql:/docker-entrypoint-initdb.d/02-evolution.sql:ro
     networks:
       - barberflow_network
     healthcheck:
@@ -74,41 +75,6 @@ services:
       retries: 5
     command: --default-authentication-plugin=mysql_native_password
 
-  # Redis (cache da Evolution API)
-  evolution_redis:
-    image: redis:7-alpine
-    container_name: barberflow_evolution_redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - ./docker/volumes/evolution_redis_data:/data
-    networks:
-      - barberflow_network
-
-  # Evolution API (WhatsApp) - porta 8084
-  evolution_api:
-    image: evoapicloud/evolution-api:latest
-    container_name: barberflow_evolution_api
-    restart: unless-stopped
-    ports:
-      - "8084:8080"
-    volumes:
-      - ./docker/volumes/evolution_instances:/evolution/instances
-    networks:
-      - barberflow_network
-    depends_on:
-      - database
-      - evolution_redis
-    environment:
-      SERVER_PORT: "8080"
-      DATABASE_ENABLED: "true"
-      DATABASE_PROVIDER: mysql
-      DATABASE_CONNECTION_URI: mysql://${DB_USER:-barberflow}:${DB_PASSWORD}@database:3306/evolution
-      CACHE_REDIS_ENABLED: "true"
-      CACHE_REDIS_URI: redis://evolution_redis:6379
-      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-evolution_secret_key}
-      LOG_LEVEL: ERROR,WARN,INFO
-
 networks:
   barberflow_network:
     driver: bridge
@@ -117,8 +83,4 @@ volumes:
   barberflow_db_data:
     driver: local
   barberflow_uploads:
-    driver: local
-  evolution_redis_data:
-    driver: local
-  evolution_instances:
     driver: local
