@@ -16,7 +16,6 @@ services:
     image: mysql:8.0
     container_name: evolution_mysql
     restart: unless-stopped
-    mem_limit: 384m
     environment:
       MYSQL_ROOT_PASSWORD: ${EVOLUTION_DB_ROOT_PASSWORD:?Defina EVOLUTION_DB_ROOT_PASSWORD no .env}
       MYSQL_DATABASE: evolution
@@ -46,7 +45,6 @@ services:
     image: redis:7-alpine
     container_name: evolution_redis
     restart: unless-stopped
-    mem_limit: 128m
     command: redis-server --appendonly yes
     volumes:
       - ./docker/volumes/evolution_redis_data:/data
@@ -57,7 +55,6 @@ services:
     image: evoapicloud/evolution-api:latest
     container_name: evolution_api
     restart: unless-stopped
-    mem_limit: 512m
     ports:
       - "${EVOLUTION_HTTP_PORT:-8084}:8080"
     volumes:
@@ -78,6 +75,7 @@ services:
       CACHE_REDIS_URI: redis://evolution_redis:6379
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-evolution_secret_key}
       LOG_LEVEL: ERROR,WARN,INFO
+      DATABASE_SAVE_IS_ON_WHATSAPP: false
 
 networks:
   evolution_network:

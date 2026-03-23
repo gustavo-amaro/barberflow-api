@@ -3,9 +3,6 @@
 # Evolution API fica em outro servidor: use docker-compose.evolution.yml e aponte
 # WHATSAPP_EVOLUTION_BASE_URL para a URL pública dessa instância (mesmo EVOLUTION_API_KEY no .env da API).
 #
-# mem_limit: evita um único container consumir toda a RAM do host (swap/travamentos).
-# Ajuste se tiver mais RAM ou se algum serviço reiniciar por OOM.
-#
 # Uso:
 #   1. Crie .env com APP_SECRET, DB_PASSWORD, JWT_PASSPHRASE, etc.
 #   2. Gere as chaves JWT em config/jwt/
