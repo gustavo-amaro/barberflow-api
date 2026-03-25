@@ -39,9 +39,6 @@ services:
       - barberflow_uploads:/var/www/public/uploads
     networks:
       - barberflow_network
-    depends_on:
-      database:
-        condition: service_healthy
 
 networks:
   barberflow_network:
