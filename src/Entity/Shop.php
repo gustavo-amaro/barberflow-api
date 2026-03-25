@@ -13,6 +13,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\HasLifecycleCallbacks]
 class Shop
 {
+    /** Dias de acesso no plano gratuito (trial), a partir de createdAt. */
+    private const TRIAL_PERIOD_DAYS = 7;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -464,7 +467,7 @@ class Shop
 
     /** Assinatura está ativa:
      * - Se houver subscriptionEndsAt: data de fim >= hoje
-     * - Se for plano gratuito (trial ou sem plano): createdAt + 15 dias >= hoje
+     * - Se for plano gratuito (trial ou sem plano): createdAt + TRIAL_PERIOD_DAYS >= hoje
      */
     public function isSubscriptionActive(): bool
     {
@@ -475,14 +478,14 @@ class Shop
             return $this->subscriptionEndsAt >= $today;
         }
 
-        // Plano gratuito (trial): 15 dias a partir da criação da barbearia
+        // Plano gratuito (trial): período definido em TRIAL_PERIOD_DAYS a partir da criação
         if ($this->subscriptionPlan === null || $this->subscriptionPlan === 'trial') {
             if ($this->createdAt === null) {
                 // fallback defensivo: se por algum motivo não tiver createdAt, considera ativo
                 return true;
             }
 
-            $trialEnd = $this->createdAt->modify('+15 days');
+            $trialEnd = $this->createdAt->modify('+' . self::TRIAL_PERIOD_DAYS . ' days');
             return $trialEnd >= $today;
         }
 
