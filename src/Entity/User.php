@@ -14,6 +14,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\HasLifecycleCallbacks]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    public const ACCESS_OWNER = 'owner';
+    public const ACCESS_BARBER = 'barber';
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -44,9 +46,31 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private array $roles = [];
 
-    #[ORM\OneToOne(mappedBy: 'owner', cascade: ['persist', 'remove'])]
+    #[ORM\ManyToOne(inversedBy: 'members')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     #[Groups(['user:read'])]
     private ?Shop $shop = null;
+
+    #[ORM\OneToOne(mappedBy: 'user')]
+    #[Groups(['user:read'])]
+    private ?Barber $barber = null;
+
+    #[ORM\OneToOne(mappedBy: 'owner')]
+    private ?Shop $ownedShop = null;
+
+    #[ORM\Column(length: 20, options: ['default' => self::ACCESS_OWNER])]
+    #[Groups(['user:read'])]
+    private string $accessRole = self::ACCESS_OWNER;
+
+    #[ORM\Column(options: ['default' => true])]
+    private bool $active = true;
+
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['user:read'])]
+    private bool $mustChangePassword = false;
+
+    #[ORM\Column(options: ['default' => 0])]
+    private int $sessionVersion = 0;
 
     #[ORM\Column]
     #[Groups(['user:read'])]
@@ -121,6 +145,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $roles = $this->roles;
         $roles[] = 'ROLE_USER';
+        $roles[] = $this->isOwner() ? 'ROLE_OWNER' : 'ROLE_BARBER';
         return array_unique($roles);
     }
 
@@ -137,15 +162,89 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function setShop(?Shop $shop): static
     {
-        if ($shop === null && $this->shop !== null) {
-            $this->shop->setOwner(null);
-        }
-
-        if ($shop !== null && $shop->getOwner() !== $this) {
-            $shop->setOwner($this);
-        }
-
         $this->shop = $shop;
+        return $this;
+    }
+
+    public function getBarber(): ?Barber
+    {
+        return $this->barber;
+    }
+
+    public function setBarber(?Barber $barber): static
+    {
+        if ($barber !== null && $barber->getUser() !== $this) {
+            $barber->setUser($this);
+        }
+        $this->barber = $barber;
+        return $this;
+    }
+
+    public function getOwnedShop(): ?Shop
+    {
+        return $this->ownedShop;
+    }
+
+    public function setOwnedShop(?Shop $shop): static
+    {
+        $this->ownedShop = $shop;
+        return $this;
+    }
+
+    public function getAccessRole(): string
+    {
+        return $this->accessRole;
+    }
+
+    public function setAccessRole(string $accessRole): static
+    {
+        if (!in_array($accessRole, [self::ACCESS_OWNER, self::ACCESS_BARBER], true)) {
+            throw new \InvalidArgumentException('Papel de acesso inválido');
+        }
+        $this->accessRole = $accessRole;
+        return $this;
+    }
+
+    public function isOwner(): bool
+    {
+        return $this->accessRole === self::ACCESS_OWNER;
+    }
+
+    public function isBarberUser(): bool
+    {
+        return $this->accessRole === self::ACCESS_BARBER;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->active;
+    }
+
+    public function setActive(bool $active): static
+    {
+        $this->active = $active;
+        return $this;
+    }
+
+    public function mustChangePassword(): bool
+    {
+        return $this->mustChangePassword;
+    }
+
+    public function setMustChangePassword(bool $mustChange): static
+    {
+        $this->mustChangePassword = $mustChange;
+        return $this;
+    }
+
+    public function getSessionVersion(): int
+    {
+        return $this->sessionVersion;
+    }
+
+    public function revokeSessions(): static
+    {
+        $this->sessionVersion++;
         return $this;
     }
 

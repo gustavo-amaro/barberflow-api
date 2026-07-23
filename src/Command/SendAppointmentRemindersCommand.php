@@ -14,7 +14,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 #[AsCommand(
     name: 'app:appointment-reminders',
-    description: 'Envia lembretes WhatsApp à barbearia e ao cliente para agendamentos confirmados que ocorrem em ~30 min.',
+    description: 'Envia lembretes WhatsApp à barbearia, ao barbeiro e ao cliente para agendamentos confirmados que ocorrem em ~30 min.',
 )]
 class SendAppointmentRemindersCommand extends Command
 {
@@ -65,7 +65,7 @@ class SendAppointmentRemindersCommand extends Command
         }
         $this->entityManager->flush();
 
-        $io->success(sprintf('Lembrete enviado para a barbearia e o cliente em %d agendamento(s).', count($appointments)));
+        $io->success(sprintf('Lembrete enviado para a barbearia, o barbeiro e o cliente em %d agendamento(s).', count($appointments)));
         return Command::SUCCESS;
     }
 }

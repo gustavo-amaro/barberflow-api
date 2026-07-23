@@ -103,11 +103,11 @@ class EvolutionApiWhatsAppService implements WhatsAppServiceInterface
             return '';
         }
         // Brasil: se já tem 11 dígitos (DDD+9+número), adiciona 55
-        if (strlen($digits) === 11 && str_starts_with($digits, '0') === false) {
-            return '55' . $digits;
-        }
-        if (strlen($digits) === 12 && str_starts_with($digits, '55')) {
+        if ((strlen($digits) === 12 || strlen($digits) === 13) && str_starts_with($digits, '55')) {
             return $digits;
+        }
+        if ((strlen($digits) === 10 || strlen($digits) === 11) && str_starts_with($digits, '0') === false) {
+            return '55' . $digits;
         }
         if (strlen($digits) >= 10) {
             return '55' . $digits;

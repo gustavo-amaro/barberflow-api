@@ -25,6 +25,10 @@ class Barber
     #[Groups(['barber:read'])]
     private ?Shop $shop = null;
 
+    #[ORM\OneToOne(inversedBy: 'barber')]
+    #[ORM\JoinColumn(nullable: true, unique: true, onDelete: 'SET NULL')]
+    private ?User $user = null;
+
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank]
     #[Assert\Length(max: 100)]
@@ -131,6 +135,20 @@ class Barber
     public function setShop(?Shop $shop): static
     {
         $this->shop = $shop;
+        return $this;
+    }
+
+    public function getUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function setUser(?User $user): static
+    {
+        $this->user = $user;
+        if ($user !== null && $user->getBarber() !== $this) {
+            $user->setBarber($this);
+        }
         return $this;
     }
 

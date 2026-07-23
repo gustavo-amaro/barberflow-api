@@ -51,7 +51,18 @@ class AppointmentController extends AbstractController
         $endDate = $request->query->get('end_date');
         $barberId = $request->query->get('barber_id');
 
-        if ($date) {
+        $ownBarber = $user->isBarberUser() ? $user->getBarber() : null;
+        if ($user->isBarberUser() && !$ownBarber) {
+            return $this->json(['error' => 'Perfil profissional não vinculado'], Response::HTTP_FORBIDDEN);
+        }
+
+        if ($date && $ownBarber) {
+            $appointments = $this->appointmentRepository->findByBarberAndDate($ownBarber, new \DateTime($date));
+        } elseif ($startDate && $endDate && $ownBarber) {
+            $appointments = $this->appointmentRepository->findByBarberAndDateRange($ownBarber, new \DateTime($startDate), new \DateTime($endDate));
+        } elseif ($ownBarber) {
+            $appointments = $this->appointmentRepository->findByBarberAndDate($ownBarber, new \DateTime('today'));
+        } elseif ($date) {
             $appointments = $this->appointmentRepository->findByShopAndDate(
                 $shop,
                 new \DateTime($date)
@@ -96,9 +107,7 @@ class AppointmentController extends AbstractController
             $this->entityManager->flush();
         }
 
-        return $this->json(
-            $this->serializer->normalize($appointments, null, ['groups' => 'appointment:read'])
-        );
+        return $this->json($this->appointmentData($appointments, $user));
     }
 
     #[Route('/pending', name: 'api_appointments_pending', methods: ['GET'])]
@@ -113,9 +122,12 @@ class AppointmentController extends AbstractController
         }
 
         $appointments = $this->appointmentRepository->findPendingByShop($shop);
+        if ($user->isBarberUser()) {
+            $appointments = array_values(array_filter($appointments, fn (Appointment $a) => $a->getBarber()->getId() === $user->getBarber()?->getId()));
+        }
 
         return $this->json(
-            $this->serializer->normalize($appointments, null, ['groups' => 'appointment:read'])
+            $this->appointmentData($appointments, $user)
         );
     }
 
@@ -130,7 +142,9 @@ class AppointmentController extends AbstractController
             return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        $barberId = (int) ($request->query->get('barber_id') ?? 0);
+        $barberId = $user->isBarberUser()
+            ? (int) ($user->getBarber()?->getId() ?? 0)
+            : (int) ($request->query->get('barber_id') ?? 0);
         $dateStr = $request->query->get('date');
         $serviceId = $request->query->get('service_id') ? (int) $request->query->get('service_id') : null;
         if (!$barberId || !$dateStr) {
@@ -178,7 +192,9 @@ class AppointmentController extends AbstractController
         }
 
         // Validate barber
-        $barber = $this->barberRepository->find($data['barber_id'] ?? 0);
+        $barber = $user->isBarberUser()
+            ? $user->getBarber()
+            : $this->barberRepository->find($data['barber_id'] ?? 0);
         if (!$barber || $barber->getShop()->getId() !== $shop->getId()) {
             return $this->json(['error' => 'Barbeiro não encontrado'], Response::HTTP_NOT_FOUND);
         }
@@ -242,15 +258,9 @@ class AppointmentController extends AbstractController
         $appointment->setPhone($data['phone'] ?? ($client ? $client->getPhone() : null));
         $appointment->setDate(new \DateTime($data['date'] ?? 'today'));
         $appointment->setTime(new \DateTime($data['time'] ?? 'now'));
-        $initialStatus = $data['status'] ?? null;
-        $wasAutoConfirmed = false;
-        if ($initialStatus !== null) {
-            $appointment->setStatus($initialStatus);
-        } else {
-            $wasAutoConfirmed = $shop->isAutoConfirmAppointments();
-            $appointment->setStatus($wasAutoConfirmed ? Appointment::STATUS_CONFIRMED : Appointment::STATUS_PENDING);
-        }
-        $appointment->setPrice($data['price'] ?? $service->getPrice());
+        $wasAutoConfirmed = $shop->isAutoConfirmAppointments();
+        $appointment->setStatus($wasAutoConfirmed ? Appointment::STATUS_CONFIRMED : Appointment::STATUS_PENDING);
+        $appointment->setPrice($service->getPrice());
 
         // Validate
         $errors = $this->validator->validate($appointment);
@@ -273,7 +283,7 @@ class AppointmentController extends AbstractController
         }
 
         return $this->json(
-            $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read']),
+            $this->appointmentData($appointment, $user),
             Response::HTTP_CREATED
         );
     }
@@ -291,12 +301,12 @@ class AppointmentController extends AbstractController
 
         $appointment = $this->appointmentRepository->find($id);
 
-        if (!$appointment || $appointment->getBarber()->getShop()->getId() !== $shop->getId()) {
+        if (!$this->canAccess($appointment, $user)) {
             return $this->json(['error' => 'Agendamento não encontrado'], Response::HTTP_NOT_FOUND);
         }
 
         return $this->json(
-            $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read'])
+            $this->appointmentData($appointment, $user)
         );
     }
 
@@ -305,6 +315,7 @@ class AppointmentController extends AbstractController
     {
         /** @var User $user */
         $user = $this->getUser();
+        $this->denyAccessUnlessGranted('ROLE_OWNER');
         $shop = $user->getShop();
 
         if (!$shop) {
@@ -313,7 +324,7 @@ class AppointmentController extends AbstractController
 
         $appointment = $this->appointmentRepository->find($id);
 
-        if (!$appointment || $appointment->getBarber()->getShop()->getId() !== $shop->getId()) {
+        if (!$this->canAccess($appointment, $user)) {
             return $this->json(['error' => 'Agendamento não encontrado'], Response::HTTP_NOT_FOUND);
         }
 
@@ -323,7 +334,7 @@ class AppointmentController extends AbstractController
             return $this->json(['error' => 'Dados inválidos'], Response::HTTP_BAD_REQUEST);
         }
 
-        if (isset($data['barber_id'])) {
+        if (isset($data['barber_id']) && $user->isOwner()) {
             $barber = $this->barberRepository->find($data['barber_id']);
             if (!$barber || $barber->getShop()->getId() !== $shop->getId()) {
                 return $this->json(['error' => 'Barbeiro não encontrado'], Response::HTTP_NOT_FOUND);
@@ -351,10 +362,10 @@ class AppointmentController extends AbstractController
         if (isset($data['time'])) {
             $appointment->setTime(new \DateTime($data['time']));
         }
-        if (isset($data['status'])) {
+        if (isset($data['status']) && $user->isOwner()) {
             $appointment->setStatus($data['status']);
         }
-        if (isset($data['price'])) {
+        if (isset($data['price']) && $user->isOwner()) {
             $appointment->setPrice($data['price']);
         }
 
@@ -391,7 +402,7 @@ class AppointmentController extends AbstractController
         $this->entityManager->flush();
 
         return $this->json(
-            $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read'])
+            $this->appointmentData($appointment, $user)
         );
     }
 
@@ -408,7 +419,7 @@ class AppointmentController extends AbstractController
 
         $appointment = $this->appointmentRepository->find($id);
 
-        if (!$appointment || $appointment->getBarber()->getShop()->getId() !== $shop->getId()) {
+        if (!$this->canAccess($appointment, $user)) {
             return $this->json(['error' => 'Agendamento não encontrado'], Response::HTTP_NOT_FOUND);
         }
 
@@ -418,7 +429,7 @@ class AppointmentController extends AbstractController
         $this->appointmentNotification->notifyClientAppointmentConfirmed($appointment);
 
         return $this->json(
-            $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read'])
+            $this->appointmentData($appointment, $user)
         );
     }
 
@@ -435,7 +446,7 @@ class AppointmentController extends AbstractController
 
         $appointment = $this->appointmentRepository->find($id);
 
-        if (!$appointment || $appointment->getBarber()->getShop()->getId() !== $shop->getId()) {
+        if (!$this->canAccess($appointment, $user)) {
             return $this->json(['error' => 'Agendamento não encontrado'], Response::HTTP_NOT_FOUND);
         }
 
@@ -451,7 +462,7 @@ class AppointmentController extends AbstractController
         $this->entityManager->flush();
 
         return $this->json(
-            $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read'])
+            $this->appointmentData($appointment, $user)
         );
     }
 
@@ -468,7 +479,7 @@ class AppointmentController extends AbstractController
 
         $appointment = $this->appointmentRepository->find($id);
 
-        if (!$appointment || $appointment->getBarber()->getShop()->getId() !== $shop->getId()) {
+        if (!$this->canAccess($appointment, $user)) {
             return $this->json(['error' => 'Agendamento não encontrado'], Response::HTTP_NOT_FOUND);
         }
 
@@ -477,7 +488,7 @@ class AppointmentController extends AbstractController
         $this->appointmentNotification->notifyClientAppointmentCancelled($appointment);
 
         return $this->json(
-            $this->serializer->normalize($appointment, null, ['groups' => 'appointment:read'])
+            $this->appointmentData($appointment, $user)
         );
     }
 
@@ -486,6 +497,7 @@ class AppointmentController extends AbstractController
     {
         /** @var User $user */
         $user = $this->getUser();
+        $this->denyAccessUnlessGranted('ROLE_OWNER');
         $shop = $user->getShop();
 
         if (!$shop) {
@@ -502,5 +514,30 @@ class AppointmentController extends AbstractController
         $this->entityManager->flush();
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
+
+    private function canAccess(?Appointment $appointment, User $user): bool
+    {
+        if (!$appointment || !$user->getShop()
+            || $appointment->getBarber()->getShop()->getId() !== $user->getShop()->getId()) {
+            return false;
+        }
+        return $user->isOwner() || $appointment->getBarber()->getId() === $user->getBarber()?->getId();
+    }
+
+    private function appointmentData(Appointment|array $appointments, User $viewer): array
+    {
+        $data = $this->serializer->normalize($appointments, null, ['groups' => 'appointment:read']);
+        if ($viewer->isOwner()) return $data;
+        if ($appointments instanceof Appointment) {
+            unset($data['price']);
+            if (isset($data['service']) && is_array($data['service'])) unset($data['service']['price']);
+            return $data;
+        }
+        foreach ($data as &$item) {
+            unset($item['price']);
+            if (isset($item['service']) && is_array($item['service'])) unset($item['service']['price']);
+        }
+        return $data;
     }
 }

@@ -44,6 +44,9 @@ DB_NAME=barberflow
 DB_USER=barberflow
 JWT_TOKEN_TTL=3600
 CORS_ALLOW_ORIGIN='^https?://.*$'
+FRONTEND_APP_URL='https://linkdobarbeiro.com.br'
+MAILER_DSN='smtp://usuario:senha@servidor:587'
+MAILER_FROM='no-reply@linkdobarbeiro.com.br'
 
 # Evolution API (WhatsApp) – já incluída no compose prod na porta 8084
 EVOLUTION_API_KEY=sua_chave_secreta_evolution

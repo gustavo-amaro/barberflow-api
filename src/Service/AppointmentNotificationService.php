@@ -14,14 +14,13 @@ class AppointmentNotificationService
     ) {}
 
     /**
-     * Notifica a barbearia quando um novo agendamento é criado (público ou painel).
+     * Notifica a barbearia e o barbeiro quando um novo agendamento é criado (público ou painel).
      * Se $autoConfirmed for true, a mensagem indica "Status: confirmado automaticamente."
      */
     public function notifyShopNewAppointment(Appointment $appointment, bool $autoConfirmed = false): void
     {
         $shop = $appointment->getBarber()->getShop();
-        $phone = $shop->getPhone();
-        if (!$phone || !$this->whatsApp->canSendToShop()) {
+        if (!$this->whatsApp->canSendToShop()) {
             return;
         }
 
@@ -38,7 +37,7 @@ class AppointmentNotificationService
         $message .= "Barbeiro: {$barberName}\n";
         $message .= $autoConfirmed ? "Status: confirmado automaticamente." : "Status: pendente de confirmação.";
 
-        $this->sendSafe($shop, $phone, $message, 'notifyShopNewAppointment', true);
+        $this->notifyShopAndBarber($appointment, $message, 'notifyShopNewAppointment');
     }
 
     /**
@@ -68,13 +67,12 @@ class AppointmentNotificationService
     }
 
     /**
-     * Notifica a barbearia 30 minutos antes do horário do agendamento confirmado.
+     * Notifica a barbearia e o barbeiro 30 minutos antes do horário do agendamento confirmado.
      */
     public function notifyShopReminder(Appointment $appointment): void
     {
         $shop = $appointment->getBarber()->getShop();
-        $phone = $shop->getPhone();
-        if (!$phone || !$this->whatsApp->canSendToShop()) {
+        if (!$this->whatsApp->canSendToShop()) {
             return;
         }
 
@@ -90,7 +88,7 @@ class AppointmentNotificationService
         $message .= "Serviço: {$serviceName}\n";
         $message .= "Barbeiro: {$barberName}";
 
-        $this->sendSafe($shop, $phone, $message, 'notifyShopReminder', true);
+        $this->notifyShopAndBarber($appointment, $message, 'notifyShopReminder');
     }
 
     /**
@@ -145,6 +143,53 @@ class AppointmentNotificationService
         $message .= "Para agendar novamente, acesse o link da barbearia.";
 
         $this->sendSafe($shop, $phone, $message, 'notifyClientAppointmentCancelled', false);
+    }
+
+    /**
+     * Envia notificações internas ao telefone da barbearia e ao profissional
+     * responsável pelo agendamento. Números equivalentes são enviados apenas uma vez.
+     */
+    private function notifyShopAndBarber(Appointment $appointment, string $message, string $context): void
+    {
+        $barber = $appointment->getBarber();
+        $shop = $barber?->getShop();
+        if (!$shop || !$barber) {
+            return;
+        }
+
+        $recipients = [
+            'shop' => $shop->getPhone(),
+            'barber' => $barber->getPhone(),
+        ];
+        $sentPhones = [];
+
+        foreach ($recipients as $recipient => $phone) {
+            $phoneKey = $this->phoneKey($phone);
+            if ($phoneKey === '' || isset($sentPhones[$phoneKey])) {
+                continue;
+            }
+
+            $sentPhones[$phoneKey] = true;
+            $this->sendSafe($shop, (string) $phone, $message, $context . '.' . $recipient, true);
+        }
+    }
+
+    private function phoneKey(?string $phone): string
+    {
+        $digits = preg_replace('/\D/', '', (string) $phone) ?? '';
+        if ($digits === '') {
+            return '';
+        }
+
+        if ((strlen($digits) === 12 || strlen($digits) === 13) && str_starts_with($digits, '55')) {
+            return $digits;
+        }
+
+        if (strlen($digits) === 10 || strlen($digits) === 11) {
+            return '55' . $digits;
+        }
+
+        return $digits;
     }
 
     private function sendSafe(?\App\Entity\Shop $shop, string $phone, string $message, string $context, bool $toShop = false): void

@@ -46,9 +46,11 @@ class ServiceController extends AbstractController
             $services = $this->serviceRepository->findByShop($shop);
         }
 
-        return $this->json(
-            $this->serializer->normalize($services, null, ['groups' => 'service:read'])
-        );
+        $result = $this->serializer->normalize($services, null, ['groups' => 'service:read']);
+        if ($user->isBarberUser()) {
+            foreach ($result as &$item) unset($item['price']);
+        }
+        return $this->json($result);
     }
 
     #[Route('', name: 'api_services_create', methods: ['POST'])]
@@ -56,6 +58,7 @@ class ServiceController extends AbstractController
     {
         /** @var User $user */
         $user = $this->getUser();
+        $this->denyAccessUnlessGranted('ROLE_OWNER');
         $shop = $user->getShop();
 
         if (!$shop) {
@@ -116,9 +119,9 @@ class ServiceController extends AbstractController
             return $this->json(['error' => 'Serviço não encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json(
-            $this->serializer->normalize($service, null, ['groups' => 'service:read'])
-        );
+        $result = $this->serializer->normalize($service, null, ['groups' => 'service:read']);
+        if ($user->isBarberUser()) unset($result['price']);
+        return $this->json($result);
     }
 
     #[Route('/{id}', name: 'api_services_update', methods: ['PUT', 'PATCH'])]
@@ -126,6 +129,7 @@ class ServiceController extends AbstractController
     {
         /** @var User $user */
         $user = $this->getUser();
+        $this->denyAccessUnlessGranted('ROLE_OWNER');
         $shop = $user->getShop();
 
         if (!$shop) {
@@ -194,6 +198,7 @@ class ServiceController extends AbstractController
     {
         /** @var User $user */
         $user = $this->getUser();
+        $this->denyAccessUnlessGranted('ROLE_OWNER');
         $shop = $user->getShop();
 
         if (!$shop) {

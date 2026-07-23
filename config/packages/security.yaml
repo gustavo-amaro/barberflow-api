@@ -25,6 +25,10 @@ security:
                 check_path: /api/login
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
+            login_throttling:
+                max_attempts: 5
+                interval: '1 minute'
+            user_checker: App\Security\ActiveUserChecker
 
         api:
             pattern: ^/api
@@ -34,14 +38,19 @@ security:
             refresh_jwt:
                 check_path: /api/token/refresh
                 provider: app_user_provider
+            user_checker: App\Security\ActiveUserChecker
 
     access_control:
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
+        - { path: ^/api/forgot-password, roles: PUBLIC_ACCESS }
+        - { path: ^/api/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS }
         - { path: ^/api/shops/public, roles: PUBLIC_ACCESS }
         - { path: ^/asaas/webhook, roles: PUBLIC_ACCESS }
+        - { path: ^/api/(clients|products|dashboard|payment|upload), roles: ROLE_OWNER }
+        - { path: ^/api/shops, roles: ROLE_OWNER }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 
 when@test:

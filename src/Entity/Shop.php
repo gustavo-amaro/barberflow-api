@@ -70,10 +70,14 @@ class Shop
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $evolutionInstanceApiKey = null;
 
-    #[ORM\OneToOne(inversedBy: 'shop', cascade: ['persist'])]
+    #[ORM\OneToOne(inversedBy: 'ownedShop', cascade: ['persist'])]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['shop:read'])]
     private ?User $owner = null;
+
+    /** @var Collection<int, User> */
+    #[ORM\OneToMany(targetEntity: User::class, mappedBy: 'shop')]
+    private Collection $members;
 
     /**
      * @var Collection<int, Barber>
@@ -139,6 +143,7 @@ class Shop
         $this->products = new ArrayCollection();
         $this->clients = new ArrayCollection();
         $this->schedules = new ArrayCollection();
+        $this->members = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -283,7 +288,17 @@ class Shop
     public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
+        if ($owner !== null) {
+            $owner->setOwnedShop($this);
+            $owner->setShop($this);
+        }
         return $this;
+    }
+
+    /** @return Collection<int, User> */
+    public function getMembers(): Collection
+    {
+        return $this->members;
     }
 
     /**

@@ -82,7 +82,7 @@ class Appointment
     #[Groups(['appointment:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
-    /** Data/hora em que o lembrete (30 min antes) foi enviado à barbearia. */
+    /** Data/hora em que o lembrete (30 min antes) foi processado para barbearia, barbeiro e cliente. */
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $reminderSentAt = null;
 

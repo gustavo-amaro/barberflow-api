@@ -70,6 +70,17 @@ class AppointmentRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /** @return Appointment[] */
+    public function findByBarberAndDateRange(Barber $barber, \DateTimeInterface $startDate, \DateTimeInterface $endDate): array
+    {
+        return $this->createQueryBuilder('a')
+            ->andWhere('a.barber = :barber')
+            ->andWhere('a.date >= :startDate')->andWhere('a.date <= :endDate')
+            ->setParameter('barber', $barber)->setParameter('startDate', $startDate)->setParameter('endDate', $endDate)
+            ->orderBy('a.date', 'ASC')->addOrderBy('a.time', 'ASC')
+            ->getQuery()->getResult();
+    }
+
     /**
      * Retorna um agendamento (não cancelado) do barbeiro na data e horário informados, se existir.
      * @param int|null $excludeId ID do agendamento a ignorar (útil no update)

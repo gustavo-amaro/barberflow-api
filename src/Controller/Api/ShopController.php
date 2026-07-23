@@ -71,6 +71,20 @@ class ShopController extends AbstractController
         $shop->setInstagram($data['instagram'] ?? null);
         $shop->setOwner($user);
 
+        if (!empty($data['owner_is_barber'])) {
+            $barber = new \App\Entity\Barber();
+            $barber->setShop($shop);
+            $barber->setUser($user);
+            $barber->setName((string) $user->getName());
+            $barber->setEmail($user->getEmail());
+            $barber->setAvatar($user->getAvatar());
+            $barber->setRole('barber');
+            $barber->setWorkStart(new \DateTime('08:00'));
+            $barber->setWorkEnd(new \DateTime('18:00'));
+            $barber->setActive(true);
+            $this->entityManager->persist($barber);
+        }
+
         // Validate
         $errors = $this->validator->validate($shop);
         if (count($errors) > 0) {
@@ -443,15 +457,9 @@ class ShopController extends AbstractController
         $appointment->setPhone($data['phone'] ?? ($client ? $client->getPhone() : null));
         $appointment->setDate($aptDate);
         $appointment->setTime($aptTime);
-        $initialStatus = $data['status'] ?? null;
-        $wasAutoConfirmed = false;
-        if ($initialStatus !== null) {
-            $appointment->setStatus($initialStatus);
-        } else {
-            $wasAutoConfirmed = $shop->isAutoConfirmAppointments();
-            $appointment->setStatus($wasAutoConfirmed ? Appointment::STATUS_CONFIRMED : Appointment::STATUS_PENDING);
-        }
-        $appointment->setPrice($data['price'] ?? $service->getPrice());
+        $wasAutoConfirmed = $shop->isAutoConfirmAppointments();
+        $appointment->setStatus($wasAutoConfirmed ? Appointment::STATUS_CONFIRMED : Appointment::STATUS_PENDING);
+        $appointment->setPrice($service->getPrice());
 
         $errors = $this->validator->validate($appointment);
         if (count($errors) > 0) {

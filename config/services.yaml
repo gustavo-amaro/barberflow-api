@@ -39,6 +39,18 @@ services:
         arguments:
             $projectDir: '%kernel.project_dir%'
 
+    App\EventSubscriber\AuthCookieSubscriber:
+        arguments:
+            $appEnvironment: '%kernel.environment%'
+
+    App\Controller\Api\AuthController:
+        arguments:
+            $authPublicLimiter: '@limiter.auth_public'
+
+    App\EventSubscriber\CookieOriginSubscriber:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_APP_URL)%'
+
     # ASAAS webhook: valida header asaas-access-token quando ASAAS_WEBHOOK_TOKEN estiver definido
     App\Controller\Api\AsaasWebhookController:
         arguments:
