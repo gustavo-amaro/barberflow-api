@@ -121,6 +121,48 @@ class ShopWhatsAppController extends AbstractController
         ]);
     }
 
+    /**
+     * Desconecta o WhatsApp e remove a instância para garantir o encerramento da sessão.
+     */
+    #[Route('/disconnect', name: 'api_shop_whatsapp_disconnect', methods: ['DELETE'])]
+    public function disconnect(): JsonResponse
+    {
+        $shop = $this->getShop();
+        if (!$shop) {
+            return $this->json(['error' => 'Barbearia não encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!$shop->getEvolutionInstanceName()) {
+            return $this->json([
+                'error' => 'Nenhuma instância WhatsApp configurada.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!$this->evolutionManager->isConfigured()) {
+            return $this->json([
+                'error' => 'Evolution API não configurada no servidor.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $result = $this->evolutionManager->disconnect($shop);
+        if (!$result['success']) {
+            return $this->json([
+                'error' => $result['error'] ?? 'Não foi possível desconectar o WhatsApp.',
+            ], Response::HTTP_BAD_GATEWAY);
+        }
+
+        $shop
+            ->setEvolutionInstanceName(null)
+            ->setEvolutionInstanceApiKey(null);
+        $this->entityManager->flush();
+
+        return $this->json([
+            'instanceName' => null,
+            'state' => 'close',
+            'message' => 'WhatsApp desconectado. Conecte novamente quando quiser.',
+        ]);
+    }
+
     private function getShop(): ?Shop
     {
         /** @var User|null $user */

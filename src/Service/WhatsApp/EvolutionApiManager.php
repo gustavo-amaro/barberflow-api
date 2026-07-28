@@ -7,7 +7,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 
 /**
- * Gerencia instâncias da Evolution API por barbearia: criar, obter QR code e estado da conexão.
+ * Gerencia instâncias da Evolution API por barbearia: criar, conectar, desconectar e consultar estado.
  */
 class EvolutionApiManager
 {
@@ -94,6 +94,76 @@ class EvolutionApiManager
             return ['qrcode' => null, 'error' => 'Instância não configurada.'];
         }
         return $this->fetchQrcodeByInstance($instanceName, $shop->getEvolutionInstanceApiKey());
+    }
+
+    /**
+     * Encerra a sessão WhatsApp e remove a instância para evitar sessões pendentes.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function disconnect(Shop $shop): array
+    {
+        $instanceName = $shop->getEvolutionInstanceName();
+        if (!$instanceName || !$this->isConfigured()) {
+            return ['success' => false, 'error' => 'Instância não configurada.'];
+        }
+
+        // O endpoint delete da Evolution já executa o logout internamente
+        // quando a instância ainda está conectada.
+        $deleteResult = $this->requestInstanceAction('delete', $instanceName);
+
+        if ($deleteResult['success'] || ($deleteResult['status'] ?? null) === 404) {
+            return ['success' => true];
+        }
+
+        return [
+            'success' => false,
+            'error' => $deleteResult['error'] ?? 'Erro ao remover instância WhatsApp.',
+        ];
+    }
+
+    /**
+     * @return array{success: bool, status?: int, error?: string}
+     */
+    private function requestInstanceAction(string $action, string $instanceName): array
+    {
+        $url = $this->evolutionBaseUrl
+            . '/instance/'
+            . $action
+            . '/'
+            . rawurlencode($instanceName);
+
+        try {
+            $response = $this->httpClient->request('DELETE', $url, [
+                'headers' => $this->defaultHeaders(),
+                'timeout' => 15,
+            ]);
+            $status = $response->getStatusCode();
+
+            if ($status >= 200 && $status < 300) {
+                return ['success' => true, 'status' => $status];
+            }
+
+            $data = $response->toArray(false);
+            $message = $data['response']['message']
+                ?? $data['message']
+                ?? $data['error']
+                ?? 'Erro na Evolution API';
+            if (is_array($message)) {
+                $message = implode(', ', $message);
+            }
+
+            return [
+                'success' => false,
+                'status' => $status,
+                'error' => (string) $message,
+            ];
+        } catch (ExceptionInterface $e) {
+            return [
+                'success' => false,
+                'error' => 'Falha ao comunicar com Evolution API: ' . $e->getMessage(),
+            ];
+        }
     }
 
     /**

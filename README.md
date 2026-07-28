@@ -188,6 +188,10 @@ ASSAS_SANDBOX_BASE_URL=https://sandbox.asaas.com/api
 | GET | `/api/shops` | Ver barbearia do usuário |
 | PUT | `/api/shops` | Atualizar barbearia |
 | GET | `/api/shops/public/{slug}` | Ver barbearia pública |
+| GET | `/api/shops/whatsapp/status` | Consultar conexão do WhatsApp |
+| POST | `/api/shops/whatsapp/create` | Criar instância e gerar QR code |
+| GET | `/api/shops/whatsapp/qrcode` | Gerar novo QR code para conexão |
+| DELETE | `/api/shops/whatsapp/disconnect` | Desconectar o WhatsApp e remover a instância |
 
 ### Barbeiros (Barbers)
 
