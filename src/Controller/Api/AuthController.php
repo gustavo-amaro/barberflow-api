@@ -5,15 +5,16 @@ namespace App\Controller\Api;
 use App\Entity\User;
 use App\Entity\PasswordResetToken;
 use App\Repository\UserRepository;
+use App\Service\PasswordResetMailer;
+use App\Service\PasswordResetRequestLimiter;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Email;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -25,8 +26,10 @@ class AuthController extends AbstractController
         private UserRepository $userRepository,
         private UserPasswordHasherInterface $passwordHasher,
         private ValidatorInterface $validator,
-        private MailerInterface $mailer,
-        private RateLimiterFactory $authPublicLimiter
+        private PasswordResetMailer $passwordResetMailer,
+        private PasswordResetRequestLimiter $passwordResetRequestLimiter,
+        private RateLimiterFactory $authPublicLimiter,
+        private LoggerInterface $logger,
     ) {}
 
     #[Route('/register', name: 'api_register', methods: ['POST'])]
@@ -152,7 +155,20 @@ class AuthController extends AbstractController
     {
         if ($limited = $this->limitPublicAuth($request)) return $limited;
         $data = json_decode($request->getContent(), true) ?? [];
-        $user = $this->userRepository->findByEmail(mb_strtolower(trim((string) ($data['email'] ?? ''))));
+        $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
+        $passwordResetLimit = $this->passwordResetRequestLimiter->consume($email);
+        if (!$passwordResetLimit->isAccepted()) {
+            $retryAfter = max(1, $passwordResetLimit->getRetryAfter()->getTimestamp() - time());
+            $response = $this->json([
+                'error' => 'Aguarde 1 minuto antes de solicitar uma nova redefinição de senha.',
+                'retryAfter' => $retryAfter,
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+            $response->headers->set('Retry-After', (string) $retryAfter);
+
+            return $response;
+        }
+
+        $user = $this->userRepository->findByEmail($email);
         if ($user && $user->isActive()) {
             $this->entityManager->createQuery(
                 'UPDATE App\\Entity\\PasswordResetToken token SET token.usedAt = :now WHERE token.user = :user AND token.usedAt IS NULL'
@@ -161,13 +177,15 @@ class AuthController extends AbstractController
             $reset = new PasswordResetToken($user, hash('sha256', $plainToken), new \DateTimeImmutable('+30 minutes'));
             $this->entityManager->persist($reset);
             $this->entityManager->flush();
-            $baseUrl = rtrim((string) ($_ENV['FRONTEND_APP_URL'] ?? $_SERVER['FRONTEND_APP_URL'] ?? 'http://localhost:3000'), '/');
-            $message = (new Email())
-                ->from((string) ($_ENV['MAILER_FROM'] ?? $_SERVER['MAILER_FROM'] ?? 'no-reply@linkdobarbeiro.com.br'))
-                ->to((string) $user->getEmail())
-                ->subject('Redefinição de senha — Link do Barbeiro')
-                ->text("Use este link nos próximos 30 minutos para redefinir sua senha:\n\n{$baseUrl}/auth/redefinir-senha?token={$plainToken}");
-            try { $this->mailer->send($message); } catch (\Throwable) { /* Resposta neutra evita enumeração. */ }
+            try {
+                $this->passwordResetMailer->send($user, $plainToken);
+            } catch (\Throwable $exception) {
+                // A resposta permanece neutra para evitar enumeração de contas.
+                $this->logger->error('Não foi possível enviar o e-mail de redefinição de senha.', [
+                    'userId' => $user->getId(),
+                    'exception' => $exception,
+                ]);
+            }
         }
         return $this->json(['message' => 'Se o email estiver cadastrado, enviaremos as instruções.'], Response::HTTP_ACCEPTED);
     }

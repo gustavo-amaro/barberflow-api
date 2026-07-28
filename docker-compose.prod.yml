@@ -31,6 +31,10 @@ services:
       JWT_PASSPHRASE: ${JWT_PASSPHRASE}
       JWT_TOKEN_TTL: ${JWT_TOKEN_TTL:-3600}
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-'^https?://.*$'}
+      FRONTEND_APP_URL: ${FRONTEND_APP_URL}
+      MAILER_DSN: ${MAILER_DSN}
+      MAILER_FROM: ${MAILER_FROM}
+      MAILER_FROM_NAME: ${MAILER_FROM_NAME:-Link do Barbeiro}
       WHATSAPP_EVOLUTION_BASE_URL: ${WHATSAPP_EVOLUTION_BASE_URL}
     volumes:
       # .env do host (Symfony/console precisa ler)

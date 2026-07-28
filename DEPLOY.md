@@ -45,8 +45,12 @@ DB_USER=barberflow
 JWT_TOKEN_TTL=3600
 CORS_ALLOW_ORIGIN='^https?://.*$'
 FRONTEND_APP_URL='https://linkdobarbeiro.com.br'
-MAILER_DSN='smtp://usuario:senha@servidor:587'
-MAILER_FROM='no-reply@linkdobarbeiro.com.br'
+
+# Mailgun via API HTTP (recomendado)
+# Use o domínio de envio verificado no Mailgun; para a região europeia, acrescente ?region=eu.
+MAILER_DSN='mailgun+https://key-SUA_CHAVE_API:mg.seudominio.com@default'
+MAILER_FROM='no-reply@mg.seudominio.com'
+MAILER_FROM_NAME='Link do Barbeiro'
 
 # Evolution API (WhatsApp) – já incluída no compose prod na porta 8084
 EVOLUTION_API_KEY=sua_chave_secreta_evolution
@@ -54,6 +58,20 @@ EVOLUTION_API_KEY=sua_chave_secreta_evolution
 ```
 
 **Importante:** não use os valores de exemplo em produção; gere chaves e senhas fortes.
+
+As credenciais do Mailgun ficam em **Sending > Domain Settings > Sending API
+Keys**. O domínio usado em `MAILER_FROM` deve estar autorizado no Mailgun. Se a
+conta estiver usando um domínio sandbox, apenas destinatários previamente
+autorizados receberão mensagens.
+
+Como alternativa à API HTTP, use as credenciais SMTP do domínio:
+
+```env
+MAILER_DSN='mailgun+smtp://postmaster%40mg.seudominio.com:SENHA_SMTP@default'
+```
+
+Codifique caracteres especiais da chave, usuário ou senha para URL antes de
+colocá-los no DSN (por exemplo, `@` vira `%40`).
 
 ### 3. Gerar chaves JWT
 
@@ -110,6 +128,7 @@ docker compose -f docker-compose.prod.yml run --rm --entrypoint "" api \
 | Parar tudo | `docker compose -f docker-compose.prod.yml down` |
 | Rebuild e subir | `docker compose -f docker-compose.prod.yml up -d --build` |
 | Entrar no container | `docker compose -f docker-compose.prod.yml exec api sh` |
+| Testar envio pelo Mailgun | `docker compose -f docker-compose.prod.yml exec api php bin/console mailer:test destinatario@exemplo.com --from=no-reply@mg.seudominio.com` |
 
 ## Banco de dados
 
@@ -137,7 +156,7 @@ O `docker-compose.prod.yml` já inclui a Evolution API e o Redis:
 ## Segurança em produção
 
 - Use HTTPS na frente da API (Nginx/Caddy na host ou proxy reverso).
-- Mantenha `APP_SECRET`, `DB_PASSWORD`, `JWT_PASSPHRASE` e chaves JWT em segredo e nunca no repositório.
+- Mantenha `APP_SECRET`, `DB_PASSWORD`, `JWT_PASSPHRASE`, chaves JWT e a chave do Mailgun em segredo e nunca no repositório.
 - Restrinja `CORS_ALLOW_ORIGIN` aos domínios do seu front (ex.: `'^https://(www\.)?seusite\.com$'`).
 - Atualize a imagem e o sistema da VPS com frequência.
 

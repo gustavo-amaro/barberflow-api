@@ -9,6 +9,10 @@ framework:
             policy: 'sliding_window'
             limit: 10
             interval: '1 minute'
+        password_reset:
+            policy: 'fixed_window'
+            limit: 1
+            interval: '1 minute'
 
     # Enables session support. Note that the session will ONLY be started if you read or write from it.
     # Remove or comment this section to explicitly disable session support.
