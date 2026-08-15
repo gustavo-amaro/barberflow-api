@@ -47,6 +47,12 @@ class Shop
     #[Groups(['shop:read', 'shop:write'])]
     private ?string $instagram = null;
 
+    /** Cor de destaque da marca (hex, ex: #F59E0B). Usada no painel e na página pública de agendamento. */
+    #[ORM\Column(length: 7, nullable: true)]
+    #[Assert\Regex(pattern: '/^#[0-9A-Fa-f]{6}$/', message: 'Cor deve estar no formato hexadecimal, ex: #F59E0B')]
+    #[Groups(['shop:read', 'shop:write'])]
+    private ?string $accentColor = null;
+
     /** Se true, todo agendamento novo é criado já como confirmado. */
     #[ORM\Column(options: ['default' => false])]
     #[Groups(['shop:read', 'shop:write'])]
@@ -215,6 +221,17 @@ class Shop
     public function setInstagram(?string $instagram): static
     {
         $this->instagram = $instagram;
+        return $this;
+    }
+
+    public function getAccentColor(): ?string
+    {
+        return $this->accentColor;
+    }
+
+    public function setAccentColor(?string $accentColor): static
+    {
+        $this->accentColor = $accentColor;
         return $this;
     }
 

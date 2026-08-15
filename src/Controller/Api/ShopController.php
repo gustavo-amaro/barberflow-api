@@ -273,6 +273,9 @@ class ShopController extends AbstractController
         if (array_key_exists('instagram', $data)) {
             $shop->setInstagram($data['instagram']);
         }
+        if (array_key_exists('accentColor', $data)) {
+            $shop->setAccentColor($data['accentColor']);
+        }
         if (array_key_exists('autoConfirmAppointments', $data)) {
             $shop->setAutoConfirmAppointments((bool) $data['autoConfirmAppointments']);
         }
@@ -310,6 +313,7 @@ class ShopController extends AbstractController
             'logo' => $shop->getLogo(),
             'phone' => $shop->getPhone(),
             'instagram' => $shop->getInstagram(),
+            'accentColor' => $shop->getAccentColor(),
         ]);
     }
 
@@ -336,6 +340,7 @@ class ShopController extends AbstractController
                 'logo' => $shop->getLogo(),
                 'phone' => $shop->getPhone(),
                 'instagram' => $shop->getInstagram(),
+                'accentColor' => $shop->getAccentColor(),
                 'closedDates' => $shop->getClosedDates(),
             ],
             'services' => $this->serializer->normalize($services, null, ['groups' => 'service:read']),
