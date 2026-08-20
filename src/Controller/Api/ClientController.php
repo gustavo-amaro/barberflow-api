@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\Client;
 use App\Entity\User;
+use App\Repository\AppointmentRepository;
 use App\Repository\ClientRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,6 +21,7 @@ class ClientController extends AbstractController
     public function __construct(
         private EntityManagerInterface $entityManager,
         private ClientRepository $clientRepository,
+        private AppointmentRepository $appointmentRepository,
         private SerializerInterface $serializer,
         private ValidatorInterface $validator
     ) {}
@@ -216,6 +218,13 @@ class ClientController extends AbstractController
 
         if (!$client || $client->getShop()->getId() !== $shop->getId()) {
             return $this->json(['error' => 'Cliente não encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (count($this->appointmentRepository->findByClient($client)) > 0) {
+            return $this->json(
+                ['error' => 'Não é possível excluir: este cliente possui agendamentos no histórico.'],
+                Response::HTTP_CONFLICT
+            );
         }
 
         $this->entityManager->remove($client);
