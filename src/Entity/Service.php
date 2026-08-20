@@ -17,7 +17,7 @@ class Service
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['service:read', 'appointment:read'])]
+    #[Groups(['service:read', 'appointment:read', 'plan:read', 'subscription_usage:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'services')]
@@ -28,19 +28,19 @@ class Service
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank]
     #[Assert\Length(max: 100)]
-    #[Groups(['service:read', 'service:write', 'appointment:read'])]
+    #[Groups(['service:read', 'service:write', 'appointment:read', 'plan:read', 'subscription_usage:read'])]
     private ?string $name = null;
 
     #[ORM\Column]
     #[Assert\NotBlank]
     #[Assert\Positive]
-    #[Groups(['service:read', 'service:write', 'appointment:read'])]
+    #[Groups(['service:read', 'service:write', 'appointment:read', 'plan:read'])]
     private ?int $duration = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2)]
     #[Assert\NotBlank]
     #[Assert\PositiveOrZero]
-    #[Groups(['service:read', 'service:write', 'appointment:read'])]
+    #[Groups(['service:read', 'service:write', 'appointment:read', 'plan:read'])]
     private ?string $price = null;
 
     #[ORM\Column(length: 10, nullable: true)]

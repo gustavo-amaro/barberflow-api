@@ -49,7 +49,7 @@ security:
         - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS }
         - { path: ^/api/shops/public, roles: PUBLIC_ACCESS }
         - { path: ^/asaas/webhook, roles: PUBLIC_ACCESS }
-        - { path: ^/api/(clients|products|dashboard|payment|upload), roles: ROLE_OWNER }
+        - { path: ^/api/(clients|products|dashboard|payment|upload|plans|client-subscriptions), roles: ROLE_OWNER }
         - { path: ^/api/shops, roles: ROLE_OWNER }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 

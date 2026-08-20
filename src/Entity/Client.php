@@ -17,7 +17,7 @@ class Client
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['client:read', 'appointment:read'])]
+    #[Groups(['client:read', 'appointment:read', 'client_subscription:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'clients')]
@@ -28,11 +28,11 @@ class Client
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank]
     #[Assert\Length(max: 100)]
-    #[Groups(['client:read', 'client:write', 'appointment:read'])]
+    #[Groups(['client:read', 'client:write', 'appointment:read', 'client_subscription:read'])]
     private ?string $name = null;
 
     #[ORM\Column(length: 20, nullable: true)]
-    #[Groups(['client:read', 'client:write', 'appointment:read'])]
+    #[Groups(['client:read', 'client:write', 'appointment:read', 'client_subscription:read'])]
     private ?string $phone = null;
 
     #[ORM\Column(length: 150, nullable: true)]
