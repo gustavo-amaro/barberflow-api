@@ -189,9 +189,7 @@ class Plan
 
     public function clearItems(): static
     {
-        foreach ($this->items as $item) {
-            $this->removeItem($item);
-        }
+        $this->items->clear();
         return $this;
     }
 
